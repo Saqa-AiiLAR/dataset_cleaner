@@ -241,3 +241,7 @@ desktop.ini
 *.temp
 *.bak
 *.backup
+
+# Source files for scripts (text and PDF files used as input)
+*.txt
+*.pdf
