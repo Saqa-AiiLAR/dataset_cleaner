@@ -18,23 +18,30 @@ pdf_files = list(source_folder.glob("*.pdf"))
 if not pdf_files:
     print("No PDF files found in source folder.")
 else:
-    print(f"Found {len(pdf_files)} PDF file(s) to process.")
+    total_pdfs = len(pdf_files)
+    print(f"Found {total_pdfs} PDF file(s) to process.")
     
     # Process each PDF file
-    for pdf_path in pdf_files:
+    for pdf_index, pdf_path in enumerate(pdf_files, 1):
         try:
-            print(f"Processing: {pdf_path.name}")
+            print(f"\n[{pdf_index}/{total_pdfs}] Processing: {pdf_path.name}")
             
             # Get file size before processing
             file_size = pdf_path.stat().st_size
             
             # Extract text from PDF
             with pdfplumber.open(pdf_path) as pdf:
+                total_pages = len(pdf.pages)
+                print(f"  Extracting text from {total_pages} pages...")
                 extracted_text = ""
-                for page in pdf.pages:
+                for page_num, page in enumerate(pdf.pages, 1):
                     page_text = page.extract_text()
                     if page_text:
                         extracted_text += page_text
+                    # Show progress every 10 pages or at the end
+                    if page_num % 10 == 0 or page_num == total_pages:
+                        percentage = (page_num / total_pages) * 100
+                        print(f"  Progress: Page {page_num}/{total_pages} ({percentage:.1f}%)")
             
             # Count characters
             char_count = len(extracted_text)

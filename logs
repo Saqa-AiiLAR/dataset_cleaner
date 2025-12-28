@@ -19,3 +19,5 @@ pdf_insert.py - И.Федосеев-Амырыын-ыалдьыт.pdf - 2025-12-
 cleaner.py - saqa.txt -> saqaCleaned.txt - 2025-12-29 05:24:49 - ERROR: 'OpencorporaTag' object has no attribute 'language'
 cleaner.py - saqa.txt -> saqaCleaned.txt - 2025-12-29 05:25:41 - 0 chars - 0 bytes
 cleaner.py - saqa.txt -> saqaCleaned.txt - 2025-12-29 05:27:45 - 0 chars - 0 bytes
+cleaner.py - saqa.txt -> saqaCleaned.txt - 2025-12-29 05:30:04 - 0 chars - 0 bytes
+cleaner.py - saqa.txt -> saqaCleaned.txt - 2025-12-29 06:03:31 - 300250 chars - 521769 bytes
