@@ -214,7 +214,7 @@ logs
 # PDF files (large files, typically processed)
 *.pdf
 archive/
-source/
+# Note: source/ folder is tracked (not ignored) so folder structure is preserved
 
 # IDE and Editor files
 .vscode/
