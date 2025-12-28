@@ -213,7 +213,8 @@ logs
 
 # PDF files (large files, typically processed)
 *.pdf
-archive/
+archive/*
+!archive/.gitkeep
 # Note: source/ folder is tracked (not ignored) so folder structure is preserved
 
 # IDE and Editor files
