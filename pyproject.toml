@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "saqaparser"
+version = "1.0.0"
+description = "PDF text extraction and cleaning tool for Sakha language processing"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "See LICENSE file"}
+authors = [
+    {name = "SaqaParser Contributors"}
+]
+keywords = ["pdf", "text-extraction", "sakha", "yakut", "language-processing", "nlp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Text Processing :: Linguistic",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "pdfplumber>=0.10.0,<1.0.0",
+    "langdetect>=1.0.9,<2.0.0",
+    "pymorphy2>=0.9.1,<1.0.0",
+    "natasha>=1.5.0,<2.0.0",
+    "regex>=2023.0.0,<2026.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+saqa-pdf-extract = "pdf_insert:main"
+saqa-clean = "cleaner:main"
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.txt", "*.md"]
+
