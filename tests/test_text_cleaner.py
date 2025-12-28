@@ -7,6 +7,7 @@ import tempfile
 import os
 
 from src.text_cleaner import TextCleaner
+from src.language_detector import WordClassifier
 from src.exceptions import FileNotFoundError, ValidationError
 
 
@@ -39,16 +40,18 @@ class TestTextCleaner(unittest.TestCase):
     
     def test_is_russian_word_with_russian_word(self):
         """Test detection of Russian words."""
+        classifier = WordClassifier()
         # This test may vary based on language detection
         # Testing with a clear Russian word
-        result = TextCleaner.is_russian_word("привет")
+        result = classifier.is_russian_word("привет")
         # Should return True for Russian words
         # Note: This may fail if langdetect doesn't recognize it
         self.assertIsInstance(result, bool)
     
     def test_is_russian_word_with_empty_string(self):
         """Test with empty string."""
-        result = TextCleaner.is_russian_word("")
+        classifier = WordClassifier()
+        result = classifier.is_russian_word("")
         self.assertFalse(result)
     
     def test_cleaner_initialization_with_valid_file(self):
@@ -88,11 +91,144 @@ class TestTextCleaner(unittest.TestCase):
     
     def test_remove_russian_words_basic(self):
         """Test basic Russian word removal."""
+        # Create a cleaner instance to test
+        with open(self.input_file, "w", encoding="utf-8") as f:
+            f.write("hello world")
+        
+        cleaner = TextCleaner(
+            input_file=self.input_file,
+            output_file=self.output_file,
+            log_file=self.log_file
+        )
+        
         # Simple test - actual behavior depends on language detection
         text = "hello world"
-        result = TextCleaner.remove_russian_words(text)
+        result = cleaner.remove_russian_words(text)
         # Should return text with words joined by spaces
         self.assertIsInstance(result, str)
+    
+    # Tests for Sakha anchor characters
+    def test_has_sakha_anchor_chars(self):
+        """Test detection of Sakha anchor characters."""
+        self.assertTrue(TextCleaner.has_sakha_anchor_chars("баҕар"))  # Contains ҕ
+        self.assertTrue(TextCleaner.has_sakha_anchor_chars("үөрэн"))  # Contains ү
+        self.assertTrue(TextCleaner.has_sakha_anchor_chars("өлөр"))  # Contains ө
+        self.assertTrue(TextCleaner.has_sakha_anchor_chars("һаһыл"))  # Contains һ
+        self.assertTrue(TextCleaner.has_sakha_anchor_chars("ҥыһаан"))  # Contains ҥ
+        self.assertFalse(TextCleaner.has_sakha_anchor_chars("привет"))  # No Sakha chars
+        self.assertFalse(TextCleaner.has_sakha_anchor_chars("hello"))  # No Sakha chars
+    
+    def test_is_russian_word_with_sakha_anchor(self):
+        """Test that words with Sakha anchor characters are kept."""
+        # Words with Sakha anchors should NOT be identified as Russian
+        self.assertFalse(TextCleaner.is_russian_word("баҕар"))  # Contains ҕ - should keep
+        self.assertFalse(TextCleaner.is_russian_word("үөрэн"))  # Contains ү - should keep
+        self.assertFalse(TextCleaner.is_russian_word("өлөр"))  # Contains ө - should keep
+    
+    # Tests for Sakha diphthongs
+    def test_has_sakha_diphthongs(self):
+        """Test detection of Sakha diphthongs."""
+        self.assertTrue(TextCleaner.has_sakha_diphthongs("уонна"))  # Contains уо
+        self.assertTrue(TextCleaner.has_sakha_diphthongs("иэ"))  # Contains иэ
+        self.assertTrue(TextCleaner.has_sakha_diphthongs("ыа"))  # Contains ыа
+        self.assertTrue(TextCleaner.has_sakha_diphthongs("үө"))  # Contains үө
+        self.assertFalse(TextCleaner.has_sakha_diphthongs("привет"))  # No diphthongs
+    
+    def test_is_russian_word_with_sakha_diphthong(self):
+        """Test that words with Sakha diphthongs are kept."""
+        self.assertFalse(TextCleaner.is_russian_word("уонна"))  # Contains уо - should keep
+    
+    # Tests for Russian marker characters
+    def test_has_russian_marker_chars(self):
+        """Test detection of Russian marker characters."""
+        self.assertTrue(TextCleaner.has_russian_marker_chars("щит"))  # Contains щ
+        self.assertTrue(TextCleaner.has_russian_marker_chars("царь"))  # Contains ц
+        self.assertTrue(TextCleaner.has_russian_marker_chars("объявление"))  # Contains ъ
+        self.assertTrue(TextCleaner.has_russian_marker_chars("флаг"))  # Contains ф
+        self.assertFalse(TextCleaner.has_russian_marker_chars("баҕар"))  # No Russian markers
+    
+    def test_is_russian_word_with_russian_marker(self):
+        """Test that words with Russian markers are deleted."""
+        self.assertTrue(TextCleaner.is_russian_word("щит"))  # Contains щ - should delete
+        self.assertTrue(TextCleaner.is_russian_word("царь"))  # Contains ц - should delete
+        self.assertTrue(TextCleaner.is_russian_word("флаг"))  # Contains ф - should delete
+    
+    # Tests for morphological patterns
+    def test_matches_russian_patterns(self):
+        """Test detection of Russian morphological patterns."""
+        # Verb patterns
+        self.assertTrue(TextCleaner.matches_russian_patterns("читается"))  # Ends with -ется
+        self.assertTrue(TextCleaner.matches_russian_patterns("читается"))  # Ends with -ется
+        self.assertTrue(TextCleaner.matches_russian_patterns("читаешь"))  # Ends with -ешь
+        self.assertTrue(TextCleaner.matches_russian_patterns("читал"))  # Ends with -л
+        
+        # Adjective patterns
+        self.assertTrue(TextCleaner.matches_russian_patterns("красивый"))  # Ends with -ый
+        self.assertTrue(TextCleaner.matches_russian_patterns("красивая"))  # Ends with -ая
+        self.assertTrue(TextCleaner.matches_russian_patterns("красивое"))  # Ends with -ое
+        
+        # Noun patterns - test with words that actually end with these patterns
+        # Note: We can't easily test -ость, -ение, -ание without real Russian words
+        # But the pattern matching logic should work for words that do end with these
+        self.assertFalse(TextCleaner.matches_russian_patterns("баҕар"))  # No Russian patterns
+    
+    def test_matches_sakha_patterns(self):
+        """Test detection of Sakha morphological patterns."""
+        # Plural patterns
+        self.assertTrue(TextCleaner.matches_sakha_patterns("оҕолор"))  # Ends with -лор
+        self.assertTrue(TextCleaner.matches_sakha_patterns("киһилэр"))  # Ends with -лэр
+        self.assertTrue(TextCleaner.matches_sakha_patterns("киһитэр"))  # Ends with -тэр
+        
+        # Possessive patterns
+        self.assertTrue(TextCleaner.matches_sakha_patterns("киһитэ"))  # Ends with -тэ
+        self.assertTrue(TextCleaner.matches_sakha_patterns("киһита"))  # Ends with -та
+        self.assertFalse(TextCleaner.matches_sakha_patterns("привет"))  # No Sakha patterns
+    
+    def test_is_russian_word_with_russian_patterns(self):
+        """Test that words with Russian patterns are deleted."""
+        self.assertTrue(TextCleaner.is_russian_word("читается"))  # Russian verb pattern
+        self.assertTrue(TextCleaner.is_russian_word("красивый"))  # Russian adjective pattern
+    
+    def test_is_russian_word_with_sakha_patterns(self):
+        """Test that words with Sakha patterns are kept."""
+        self.assertFalse(TextCleaner.is_russian_word("оҕолор"))  # Sakha plural pattern - should keep
+        self.assertFalse(TextCleaner.is_russian_word("киһитэ"))  # Sakha possessive pattern - should keep
+    
+    # Tests for combination of rules
+    def test_priority_sakha_anchor_over_russian_marker(self):
+        """Test that Sakha anchors have priority over Russian markers."""
+        # Word with both Sakha anchor and Russian marker should be kept (Sakha anchor wins)
+        # Note: This is a theoretical test - in practice, such words are rare
+        # But if they exist, Sakha anchor should win
+        word_with_both = "баҕар"  # Has ҕ (Sakha anchor)
+        # This word doesn't have Russian markers, but if it did, anchor should win
+        self.assertFalse(TextCleaner.is_russian_word(word_with_both))  # Should keep
+    
+    def test_priority_sakha_pattern_over_russian_pattern(self):
+        """Test that Sakha patterns have priority over Russian patterns."""
+        # If a word matches both patterns (unlikely), Sakha pattern should win
+        # This is handled by checking Sakha patterns first in the code
+        pass  # Hard to create realistic test case
+    
+    def test_remove_russian_words_with_sakha_words(self):
+        """Test removal of Russian words while preserving Sakha words."""
+        # Create a cleaner instance to test
+        with open(self.input_file, "w", encoding="utf-8") as f:
+            f.write("баҕар үөрэн уонна привет читается")
+        
+        cleaner = TextCleaner(
+            input_file=self.input_file,
+            output_file=self.output_file,
+            log_file=self.log_file
+        )
+        
+        text = "баҕар үөрэн уонна привет читается"
+        result = cleaner.remove_russian_words(text)
+        # Should keep Sakha words, remove Russian words
+        # Exact result depends on language detection, but Sakha words should be preserved
+        self.assertIn("баҕар", result)  # Sakha word with anchor
+        self.assertIn("үөрэн", result)  # Sakha word with anchor
+        self.assertIn("уонна", result)  # Sakha word with diphthong
 
 
 if __name__ == "__main__":

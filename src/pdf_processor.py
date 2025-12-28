@@ -8,13 +8,14 @@ from typing import List, Tuple, Optional
 import logging
 
 from .config import config
-from .utils import validate_path, format_file_size, get_timestamp
-from .exceptions import PDFProcessingError, ValidationError, FileNotFoundError
+from .utils import format_file_size, get_timestamp
+from .exceptions import PDFProcessingError
+from .base_processor import BaseProcessor
 
 logger = logging.getLogger("SaqaParser.pdf_processor")
 
 
-class PDFProcessor:
+class PDFProcessor(BaseProcessor):
     """Handles PDF text extraction and file management."""
     
     def __init__(self, source_folder: Optional[Path] = None, 
@@ -30,32 +31,15 @@ class PDFProcessor:
             output_file: File to append extracted text to
             log_file: File to write log entries to
         """
+        super().__init__(log_file=log_file or config.log_file)
         self.source_folder = source_folder or config.source_folder
         self.archive_folder = archive_folder or config.archive_folder
         self.output_file = output_file or config.output_file
-        self.log_file = log_file or config.log_file
         
-        # Validate and create paths
-        if not validate_path(self.source_folder, must_exist=True, must_be_file=False):
-            raise FileNotFoundError(f"Source folder does not exist: {self.source_folder}")
-        
-        # Check if source folder is readable
-        if not self.source_folder.is_dir():
-            raise ValidationError(f"Source path is not a directory: {self.source_folder}")
-        
-        # Create archive folder if it doesn't exist
-        if not validate_path(self.archive_folder, must_exist=False, must_be_file=False):
-            try:
-                self.archive_folder.mkdir(parents=True, exist_ok=True)
-            except OSError as e:
-                raise ValidationError(f"Cannot create archive folder {self.archive_folder}: {e}")
-        
-        # Check if output file's parent directory exists
-        if self.output_file.parent and not self.output_file.parent.exists():
-            try:
-                self.output_file.parent.mkdir(parents=True, exist_ok=True)
-            except OSError as e:
-                raise ValidationError(f"Cannot create output directory {self.output_file.parent}: {e}")
+        # Validate and create paths using base class methods
+        self.validate_directory(self.source_folder, must_exist=True)
+        self.validate_directory(self.archive_folder, must_exist=False, create_if_missing=True)
+        self.ensure_output_directory(self.output_file)
     
     def extract_text_from_pdf(self, pdf_path: Path) -> Tuple[str, int]:
         """
@@ -175,6 +159,15 @@ class PDFProcessor:
         
         with open(self.log_file, "a", encoding="utf-8") as f:
             f.write(log_entry)
+    
+    def process(self) -> int:
+        """
+        Process all PDF files (implements BaseProcessor interface).
+        
+        Returns:
+            Number of files processed successfully
+        """
+        return self.process_all_pdfs()
     
     def process_all_pdfs(self) -> int:
         """

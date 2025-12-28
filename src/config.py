@@ -26,6 +26,10 @@ class Config:
     # Language detection settings
     primary_language: str = "ru"  # Primary language to detect (Russian)
     
+    # Russian word removal settings
+    use_v_as_russian_marker: bool = True  # Include 'в' as Russian marker (can be disabled)
+    pattern_matching_sensitivity: float = 0.8  # Threshold for morphological pattern matching (0.0-1.0)
+    
     def __post_init__(self):
         """Ensure all paths are Path objects."""
         self.source_folder = Path(self.source_folder)

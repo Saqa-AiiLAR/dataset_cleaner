@@ -2,32 +2,20 @@
 Text cleaning module for removing Russian words and special characters.
 """
 import regex
-from langdetect import detect
-import pymorphy2
-from natasha import (
-    Segmenter,
-    MorphVocab,
-    NamesExtractor
-)
 from pathlib import Path
 from typing import List
 import logging
 
 from .config import config
-from .utils import validate_path, format_file_size, get_timestamp
-from .exceptions import TextCleaningError, ValidationError, FileNotFoundError
+from .utils import format_file_size, get_timestamp
+from .exceptions import TextCleaningError
+from .language_detector import get_classifier
+from .base_processor import BaseProcessor
 
 logger = logging.getLogger("SaqaParser.text_cleaner")
 
-# Initialize Russian language tools (module-level for efficiency)
-_morph = pymorphy2.MorphAnalyzer()
-_segmenter = Segmenter()
-_morph_vocab = MorphVocab()
-_names_extractor = NamesExtractor(_morph_vocab)
-_CYRILLIC_RE = regex.compile(r'\p{IsCyrillic}+')
 
-
-class TextCleaner:
+class TextCleaner(BaseProcessor):
     """Handles text cleaning and Russian word removal."""
     
     def __init__(self, input_file: Path = None, output_file: Path = None, 
@@ -40,95 +28,14 @@ class TextCleaner:
             output_file: Path to output cleaned text file
             log_file: Path to log file
         """
+        super().__init__(log_file=log_file or config.log_file)
         self.input_file = input_file or config.output_file
         self.output_file = output_file or config.cleaned_output_file
-        self.log_file = log_file or config.log_file
+        self.classifier = get_classifier()
         
-        # Validate input file
-        if not validate_path(self.input_file, must_exist=True, must_be_file=True):
-            raise FileNotFoundError(f"Input file does not exist: {self.input_file}")
-        
-        if not self.input_file.is_file():
-            raise ValidationError(f"Input path is not a file: {self.input_file}")
-        
-        # Check if input file is readable
-        if not self.input_file.stat().st_size > 0:
-            raise ValidationError(f"Input file is empty: {self.input_file}")
-        
-        # Check if output file's parent directory exists
-        if self.output_file.parent and not self.output_file.parent.exists():
-            try:
-                self.output_file.parent.mkdir(parents=True, exist_ok=True)
-            except OSError as e:
-                raise ValidationError(f"Cannot create output directory {self.output_file.parent}: {e}")
-    
-    @staticmethod
-    def is_russian_word(word: str) -> bool:
-        """
-        Check if a word is Russian.
-        
-        Args:
-            word: Word to check
-        
-        Returns:
-            True if word is Russian, False otherwise
-        """
-        word = word.strip()
-        
-        if not word:
-            return False
-        
-        # 1. Language detection - PRIMARY check (should distinguish Russian from Sakha)
-        detected_lang = None
-        try:
-            detected_lang = detect(word)
-            if detected_lang == config.primary_language:
-                # Language detection says it's Russian - trust this
-                return True
-            elif detected_lang and detected_lang != config.primary_language:
-                # Language detection says it's NOT Russian (e.g., Sakha) - trust this
-                return False
-        except Exception:
-            pass
-        
-        # 2. Russian names & surnames
-        matches = _names_extractor(word)
-        if matches:
-            return True
-        
-        # 3. Morphological analysis - only trust if language detection was inconclusive
-        # pymorphy2 is specifically for Russian morphology, but it might parse Sakha words too
-        # So we need to be more strict
-        try:
-            parses = _morph.parse(word)
-            if parses:
-                # Only trust morphological analysis if:
-                # - Language detection didn't work (detected_lang is None)
-                # - AND we get high-confidence parses (not just any parse)
-                for p in parses:
-                    if p.tag is not None and str(p.tag) != 'UNKN':
-                        # Check if it's a high-confidence parse (normalized form exists)
-                        if p.normal_form and p.normal_form != word.lower():
-                            # This suggests it's a real Russian word with morphology
-                            # But only if language detection didn't say it's NOT Russian
-                            if detected_lang is None:
-                                return True
-        except Exception:
-            pass
-        
-        # 4. Cyrillic check - only as absolute last resort
-        # Only use if language detection failed AND morphological analysis suggests Russian
-        if _CYRILLIC_RE.search(word) and detected_lang is None:
-            try:
-                parses = _morph.parse(word)
-                if parses and any(p.tag is not None and str(p.tag) != 'UNKN' for p in parses):
-                    # Only if we have a normalized form (suggests real Russian word)
-                    if any(p.normal_form and p.normal_form != word.lower() for p in parses):
-                        return True
-            except Exception:
-                pass
-        
-        return False
+        # Validate paths using base class methods
+        self.validate_file(self.input_file, must_exist=True, must_be_file=True)
+        self.ensure_output_directory(self.output_file)
     
     @staticmethod
     def remove_russian_words(text: str) -> str:
@@ -152,7 +59,7 @@ class TextCleaner:
         clean_words = []
         
         for i, w in enumerate(words, 1):
-            if TextCleaner.is_russian_word(w):
+            if self.classifier.is_russian_word(w):
                 russian_words_found.append(w)
             else:
                 # For non-Russian words, replace separators (-, –, _, \n) with spaces
@@ -201,6 +108,15 @@ class TextCleaner:
         
         # Join the matches back together
         return ''.join(matches)
+    
+    def process(self) -> int:
+        """
+        Process text cleaning (implements BaseProcessor interface).
+        
+        Returns:
+            Number of characters in cleaned text
+        """
+        return self.clean_text()
     
     def clean_text(self) -> int:
         """
