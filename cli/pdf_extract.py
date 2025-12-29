@@ -4,13 +4,11 @@ Extracts text from PDF files in workspace/input/ folder and appends to saqa.txt.
 """
 import argparse
 import sys
-import logging
 from pathlib import Path
 
 from src.pdf_processor import PDFProcessor
-from src.logging_config import setup_logging, disable_console_logging
 from src.config import config
-from src.exceptions import SaqaParserError
+from .common import setup_cli_logging, add_common_arguments, handle_cli_execution
 
 
 def main():
@@ -47,35 +45,15 @@ Examples:
         help=f"Output file for extracted text (default: {config.output_file})"
     )
     
-    parser.add_argument(
-        "--log",
-        type=Path,
-        default=None,
-        help=f"Log file path (default: {config.log_file})"
-    )
-    
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose logging (DEBUG level)"
-    )
-    
-    parser.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="Suppress console output (only log to file)"
-    )
+    add_common_arguments(parser)
     
     args = parser.parse_args()
     
     # Set up logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logger = setup_logging(args.log or config.log_file, level=log_level)
+    logger = setup_cli_logging(args.log, args.verbose, args.quiet)
     
-    if args.quiet:
-        disable_console_logging(logger)
-    
-    try:
+    def run_pdf_extraction() -> int:
+        """Inner function for execution logic."""
         # Create processor with custom paths if provided
         processor = PDFProcessor(
             input_folder=args.input,
@@ -93,17 +71,7 @@ Examples:
             logger.warning("No PDF files were processed.")
             return 1
     
-    except KeyboardInterrupt:
-        logger.warning("Interrupted by user")
-        return 130
-    
-    except SaqaParserError as e:
-        logger.error(f"Error: {str(e)}")
-        return 1
-    
-    except Exception as e:
-        logger.error(f"Fatal error: {str(e)}", exc_info=True)
-        return 1
+    return handle_cli_execution(run_pdf_extraction, logger)
 
 
 if __name__ == "__main__":

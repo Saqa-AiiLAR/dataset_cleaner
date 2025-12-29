@@ -2,8 +2,10 @@
 Language detection and word classification module.
 Handles detection of Russian vs Sakha words using multiple strategies.
 """
-from typing import Optional
+from typing import Optional, Set
+from pathlib import Path
 import regex
+import logging
 from langdetect import detect
 import pymorphy2
 from natasha import (
@@ -25,6 +27,176 @@ from .constants import (
 )
 
 _CYRILLIC_RE = regex.compile(r'\p{IsCyrillic}+')
+logger = logging.getLogger("SaqaParser.language_detector")
+
+
+class AdditionalRulesLoader:
+    """
+    Loads words and their stems from text files in the additional folder.
+    
+    Words from additional folder are treated as Russian words (to be removed).
+    """
+    
+    def __init__(self, additional_folder: Optional[Path] = None):
+        """
+        Initialize the rules loader.
+        
+        Args:
+            additional_folder: Path to additional folder (defaults to config.additional_folder)
+        """
+        self.additional_folder = additional_folder or config.additional_folder
+        self.words: Set[str] = set()
+        self.stems: Set[str] = set()
+        self._load_rules()
+    
+    def _extract_stems(self, word: str) -> Set[str]:
+        """
+        Extract stems from a word by removing common suffixes.
+        
+        Args:
+            word: Word to extract stems from
+            
+        Returns:
+            Set of possible stems (including the original word)
+        """
+        stems = {word.lower()}  # Always include the full word
+        word_lower = word.lower()
+        
+        # Minimum stem length
+        MIN_STEM_LENGTH = 2
+        
+        # All suffixes to try removing (longest first for better matching)
+        all_suffixes = (
+            # Russian suffixes
+            RUSSIAN_VERB_PATTERNS + 
+            RUSSIAN_ADJ_PATTERNS + 
+            RUSSIAN_NOUN_PATTERNS +
+            # Sakha suffixes
+            SAKHA_PLURAL_PATTERNS + 
+            SAKHA_POSSESSIVE_PATTERNS
+        )
+        
+        # Sort by length (longest first) to try longer suffixes first
+        all_suffixes_sorted = sorted(set(all_suffixes), key=len, reverse=True)
+        
+        # Try removing each suffix
+        for suffix in all_suffixes_sorted:
+            if word_lower.endswith(suffix):
+                stem = word_lower[:-len(suffix)]
+                if len(stem) >= MIN_STEM_LENGTH:
+                    stems.add(stem)
+        
+        return stems
+    
+    def _load_rules(self) -> None:
+        """
+        Load words from all .txt files in the additional folder.
+        
+        Reads each line as a word, ignores empty lines and comments (lines starting with #).
+        Extracts stems for each word.
+        """
+        if not self.additional_folder.exists():
+            logger.warning(
+                f"Additional folder does not exist: {self.additional_folder}. "
+                "Skipping additional rules."
+            )
+            return
+        
+        if not self.additional_folder.is_dir():
+            logger.warning(
+                f"Additional folder path is not a directory: {self.additional_folder}. "
+                "Skipping additional rules."
+            )
+            return
+        
+        # Find all .txt files
+        txt_files = list(self.additional_folder.glob("*.txt"))
+        
+        if not txt_files:
+            logger.debug(f"No .txt files found in additional folder: {self.additional_folder}")
+            return
+        
+        total_words: int = 0
+        total_stems: int = 0
+        
+        for txt_file in txt_files:
+            try:
+                with open(txt_file, "r", encoding="utf-8") as f:
+                    file_words = 0
+                    for line_num, line in enumerate(f, 1):
+                        line = line.strip()
+                        
+                        # Skip empty lines and comments
+                        if not line or line.startswith("#"):
+                            continue
+                        
+                        # Add word and its stems
+                        word_stems = self._extract_stems(line)
+                        self.words.add(line.lower())
+                        self.stems.update(word_stems)
+                        file_words += 1
+                        total_stems += len(word_stems)
+                    
+                    if file_words > 0:
+                        logger.debug(f"Loaded {file_words} word(s) from {txt_file.name}")
+                    total_words += file_words
+                    
+            except IOError as e:
+                logger.error(f"Error reading file {txt_file.name}: {e}. Skipping file.")
+                continue
+            except Exception as e:
+                logger.error(f"Unexpected error reading file {txt_file.name}: {e}. Skipping file.")
+                continue
+        
+        if total_words > 0:
+            logger.info(f"Loaded {total_words} word(s) and {len(self.stems)} unique stem(s) from additional folder")
+        else:
+            logger.warning(f"No valid words found in additional folder: {self.additional_folder}")
+    
+    def matches_word_or_stem(self, word: str) -> bool:
+        """
+        Check if word or its stem matches any word/stem from additional rules.
+        
+        Args:
+            word: Word to check
+            
+        Returns:
+            True if word or its stem matches additional rules (should be removed)
+        """
+        word_lower = word.lower()
+        
+        # Check if word itself matches
+        if word_lower in self.words:
+            return True
+        
+        # Check if word's stem matches
+        word_stems = self._extract_stems(word)
+        if word_stems & self.stems:  # Intersection check
+            return True
+        
+        # Check if any stem from additional rules matches the beginning of the word
+        # This allows matching "сахалар" when stem is "саха"
+        for stem in self.stems:
+            if word_lower.startswith(stem) and len(stem) >= 2:
+                # If word exactly matches stem, it's a match
+                if len(word_lower) == len(stem):
+                    return True
+                # If word starts with stem, check if remaining part looks like a suffix
+                remaining = word_lower[len(stem):]
+                # If remaining part is empty or starts with a known suffix pattern, it's likely a match
+                # This allows "сахалар" (stem "саха" + suffix "лар")
+                if remaining:
+                    # Check if remaining part matches any known suffix pattern
+                    all_suffixes = SAKHA_PLURAL_PATTERNS + SAKHA_POSSESSIVE_PATTERNS
+                    for suffix in all_suffixes:
+                        if remaining.startswith(suffix) or remaining == suffix:
+                            return True
+                    # Also allow if remaining is just a few characters (likely a suffix)
+                    # This is a heuristic - might have some false positives but catches most cases
+                    if len(remaining) <= 5:  # Most suffixes are short
+                        return True
+        
+        return False
 
 
 class WordClassifier:
@@ -40,6 +212,7 @@ class WordClassifier:
         self._segmenter: Optional[Segmenter] = None
         self._morph_vocab: Optional[MorphVocab] = None
         self._names_extractor: Optional[NamesExtractor] = None
+        self._additional_rules: Optional[AdditionalRulesLoader] = None
     
     @property
     def morph(self) -> pymorphy2.MorphAnalyzer:
@@ -68,6 +241,13 @@ class WordClassifier:
         if self._names_extractor is None:
             self._names_extractor = NamesExtractor(self.morph_vocab)
         return self._names_extractor
+    
+    @property
+    def additional_rules(self) -> AdditionalRulesLoader:
+        """Lazy-load additional rules from additional folder."""
+        if self._additional_rules is None:
+            self._additional_rules = AdditionalRulesLoader()
+        return self._additional_rules
     
     @staticmethod
     def has_sakha_anchor_chars(word: str) -> bool:
@@ -173,13 +353,14 @@ class WordClassifier:
         
         Priority order:
         1. Sakha anchors (highest - always keep)
+        1.5. Additional rules (high - delete if matches words/stems from additional folder)
         2. Russian markers (high - always delete, unless Sakha anchor present)
         3. Morphological patterns (medium - pattern matching)
         4. Language detection and morphology (fallback)
         
         Args:
             word: Word to check
-        
+            
         Returns:
             True if word is Russian (should be deleted), False otherwise (keep word)
         """
@@ -195,6 +376,11 @@ class WordClassifier:
         
         if self.has_sakha_diphthongs(word):
             return False  # Keep word (not Russian)
+        
+        # LAYER 1.5: Additional Rules (HIGH PRIORITY - DELETE)
+        # Check if word matches rules from additional folder
+        if self.additional_rules.matches_word_or_stem(word):
+            return True  # Delete word (matches additional rules)
         
         # LAYER 2: Russian Marker Rules (HIGH PRIORITY - DELETE)
         # If word contains Russian-specific characters, delete it

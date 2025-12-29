@@ -14,6 +14,18 @@ from .base_processor import BaseProcessor
 
 logger = logging.getLogger("SaqaParser.text_cleaner")
 
+# Pre-compiled regex patterns for performance
+_WORD_PATTERN = regex.compile(r'[\p{L}]+(?:[-–_\n][\p{L}]+)*')
+_LETTER_SPACE_NEWLINE_PATTERN = regex.compile(r'[\p{L} \n]')
+_SPACED_LETTERS_PATTERN = regex.compile(r'\b(?:\p{L}\s+)+\p{L}\b')
+_WORD_WITH_DOT_PATTERN = regex.compile(r'\p{L}+\.?')
+_SINGLE_LETTER_PATTERN = regex.compile(r'\p{L}')
+_UPPERCASE_CYRILLIC_PATTERN = regex.compile(r'^[А-ЯЁ]{2,5}$')
+_LATIN_ONLY_PATTERN = regex.compile(r'^[A-Za-z]+$')
+_ROMAN_NUMERAL_PATTERN = regex.compile(r'^[IVXLCDM]+$', regex.IGNORECASE)
+_WHITESPACE_PATTERN = regex.compile(r'\s+')
+_LETTER_PATTERN = regex.compile(r'\p{L}+')
+
 
 class TextCleaner(BaseProcessor):
     """Handles text cleaning and Russian word removal."""
@@ -49,7 +61,7 @@ class TextCleaner(BaseProcessor):
         """
         # Extract words that may contain separators (-, –, _, \n)
         # Pattern matches sequences of letters with optional separators between them
-        words = regex.findall(r'[\p{L}]+(?:[-–_\n][\p{L}]+)*', text)
+        words = _WORD_PATTERN.findall(text)
         
         total_words = len(words)
         logger.info(f"Processing {total_words} words...")
@@ -100,10 +112,9 @@ class TextCleaner(BaseProcessor):
         # Pattern to match: Unicode letters, spaces, or newlines
         # \p{L} matches any Unicode letter (includes Cyrillic and Latin)
         # Space character and \n for line breaks
-        pattern = regex.compile(r'[\p{L} \n]')
         
         # Find all matching characters (letters, spaces, newlines)
-        matches = pattern.findall(text)
+        matches = _LETTER_SPACE_NEWLINE_PATTERN.findall(text)
         
         # Join the matches back together
         return ''.join(matches)
@@ -132,21 +143,20 @@ class TextCleaner(BaseProcessor):
         
         # Step 1: Remove words where all letters are separated by spaces
         # Pattern: sequence of letters separated by spaces (e.g., "а б р е в")
-        spaced_letters_pattern = regex.compile(r'\b(?:\p{L}\s+)+\p{L}\b')
         
         def remove_spaced_letters(match):
             nonlocal spaced_letters_count
             spaced_letters_count += 1
             return ''  # Remove the match
         
-        text = spaced_letters_pattern.sub(remove_spaced_letters, text)
+        text = _SPACED_LETTERS_PATTERN.sub(remove_spaced_letters, text)
         
         # Normalize spaces after removing spaced letters
-        text = regex.sub(r'\s+', ' ', text).strip()
+        text = _WHITESPACE_PATTERN.sub(' ', text).strip()
         
         # Step 2: Split text into words and filter
         # Extract words (sequences of letters, possibly with dots at the end)
-        words = regex.findall(r'\p{L}+\.?', text)
+        words = _WORD_WITH_DOT_PATTERN.findall(text)
         
         filtered_words = []
         
@@ -158,7 +168,7 @@ class TextCleaner(BaseProcessor):
                 continue
             
             # Filter 1: Remove single-letter words (all Unicode letters)
-            if len(word_stripped) == 1 and regex.match(r'\p{L}', word_stripped):
+            if len(word_stripped) == 1 and _SINGLE_LETTER_PATTERN.match(word_stripped):
                 single_letter_count += 1
                 continue
             
@@ -169,19 +179,19 @@ class TextCleaner(BaseProcessor):
             
             # Filter 3: Remove short uppercase words (2-5 characters, all uppercase Cyrillic)
             # Pattern matches 2-5 uppercase Cyrillic letters
-            if regex.match(r'^[А-ЯЁ]{2,5}$', word_stripped):
+            if _UPPERCASE_CYRILLIC_PATTERN.match(word_stripped):
                 abbreviation_count += 1
                 continue
             
             # Filter 4: Remove English words (words consisting only of Latin letters)
             # Check if word contains only Latin letters (A-Z, a-z)
-            if regex.match(r'^[A-Za-z]+$', word_stripped):
+            if _LATIN_ONLY_PATTERN.match(word_stripped):
                 english_words_count += 1
                 continue
             
             # Filter 5: Remove Roman numerals (sequences of I, V, X, L, C, D, M)
             # Pattern matches sequences of Roman numeral characters
-            if regex.match(r'^[IVXLCDM]+$', word_stripped, regex.IGNORECASE):
+            if _ROMAN_NUMERAL_PATTERN.match(word_stripped):
                 roman_numerals_count += 1
                 continue
             
@@ -249,7 +259,7 @@ class TextCleaner(BaseProcessor):
         # Process text: first remove special characters, then heal OCR errors, then remove Russian words
         logger.info("Step 1: Removing special characters and numbers...")
         text_no_special = self.remove_special_characters(input_text)
-        word_count = len(regex.findall(r'\p{L}+', text_no_special))
+        word_count = len(_LETTER_PATTERN.findall(text_no_special))
         logger.info(f"Removed special characters. Found {word_count} words to process.")
         
         # Step 2: Word healing (repair OCR-broken words) - dynamic step numbering

@@ -4,13 +4,11 @@ Removes Russian words and special characters from saqa.txt and saves to saqaClea
 """
 import argparse
 import sys
-import logging
 from pathlib import Path
 
 from src.text_cleaner import TextCleaner
-from src.logging_config import setup_logging, disable_console_logging
 from src.config import config
-from src.exceptions import SaqaParserError
+from .common import setup_cli_logging, add_common_arguments, handle_cli_execution
 
 
 def main():
@@ -40,35 +38,15 @@ Examples:
         help=f"Output cleaned text file (default: {config.cleaned_output_file})"
     )
     
-    parser.add_argument(
-        "--log",
-        type=Path,
-        default=None,
-        help=f"Log file path (default: {config.log_file})"
-    )
-    
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose logging (DEBUG level)"
-    )
-    
-    parser.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="Suppress console output (only log to file)"
-    )
+    add_common_arguments(parser)
     
     args = parser.parse_args()
     
     # Set up logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logger = setup_logging(args.log or config.log_file, level=log_level)
+    logger = setup_cli_logging(args.log, args.verbose, args.quiet)
     
-    if args.quiet:
-        disable_console_logging(logger)
-    
-    try:
+    def run_text_cleaning() -> int:
+        """Inner function for execution logic."""
         # Create cleaner with custom paths if provided
         cleaner = TextCleaner(
             input_file=args.input,
@@ -81,17 +59,7 @@ Examples:
         logger.info(f"Processing complete. Cleaned text contains {char_count} characters.")
         return 0
     
-    except KeyboardInterrupt:
-        logger.warning("Interrupted by user")
-        return 130
-    
-    except SaqaParserError as e:
-        logger.error(f"Error: {str(e)}")
-        return 1
-    
-    except Exception as e:
-        logger.error(f"Fatal error: {str(e)}", exc_info=True)
-        return 1
+    return handle_cli_execution(run_text_cleaning, logger)
 
 
 if __name__ == "__main__":

@@ -4,15 +4,13 @@ Extracts text from PDFs and cleans it, saving results to timestamped folders.
 """
 import argparse
 import sys
-import logging
 from pathlib import Path
 
 from src.pdf_processor import PDFProcessor
 from src.text_cleaner import TextCleaner
-from src.logging_config import setup_logging, disable_console_logging
 from src.config import config
-from src.exceptions import SaqaParserError
 from src.utils import get_timestamp_folder_name
+from .common import setup_cli_logging, add_common_arguments, handle_cli_execution
 
 
 def main():
@@ -49,17 +47,7 @@ Examples:
         help=f"Results folder for output (default: {config.results_folder})"
     )
     
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose logging (DEBUG level)"
-    )
-    
-    parser.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="Suppress console output (only log to file)"
-    )
+    add_common_arguments(parser, include_log=False)  # Log is in timestamped folder
     
     args = parser.parse_args()
     
@@ -80,15 +68,12 @@ Examples:
     log_file = timestamp_path / "logs"
     
     # Set up logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logger = setup_logging(log_file, level=log_level)
-    
-    if args.quiet:
-        disable_console_logging(logger)
+    logger = setup_cli_logging(log_file, args.verbose, args.quiet)
     
     logger.info(f"Starting processing pipeline. Results will be saved to: {timestamp_path}")
     
-    try:
+    def run_pipeline() -> int:
+        """Inner function for execution logic."""
         # Step 1: Extract text from PDFs
         logger.info("Step 1: Extracting text from PDF files...")
         processor = PDFProcessor(
@@ -125,17 +110,7 @@ Examples:
         
         return 0
     
-    except KeyboardInterrupt:
-        logger.warning("Interrupted by user")
-        return 130
-    
-    except SaqaParserError as e:
-        logger.error(f"Error: {str(e)}")
-        return 1
-    
-    except Exception as e:
-        logger.error(f"Fatal error: {str(e)}", exc_info=True)
-        return 1
+    return handle_cli_execution(run_pipeline, logger)
 
 
 if __name__ == "__main__":

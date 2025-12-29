@@ -215,6 +215,13 @@ saqaCleaned.txt
 # Contents of workspace subfolders are ignored via local .gitignore files
 # See workspace/*/.gitignore for folder-specific ignore rules
 
+# Additional folder contents (word lists, names)
+workspace/additional/*.txt
+!workspace/additional/.gitkeep
+
+# Old log files from root
+workspace/logs/old_processing_log.txt
+
 # IDE and Editor files
 .vscode/
 .idea/

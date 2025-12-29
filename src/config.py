@@ -16,6 +16,7 @@ class Config:
     input_folder: Path = field(default_factory=lambda: Path("workspace/input"))
     archive_folder: Path = field(default_factory=lambda: Path("workspace/archive"))
     results_folder: Path = field(default_factory=lambda: Path("workspace/results"))
+    additional_folder: Path = field(default_factory=lambda: Path("workspace/additional"))
     
     # File paths
     output_file: Path = field(default_factory=lambda: Path("saqa.txt"))
@@ -51,6 +52,7 @@ class Config:
         self.input_folder = Path(self.input_folder)
         self.archive_folder = Path(self.archive_folder)
         self.results_folder = Path(self.results_folder)
+        self.additional_folder = Path(self.additional_folder)
         self.output_file = Path(self.output_file)
         self.cleaned_output_file = Path(self.cleaned_output_file)
         self.log_file = Path(self.log_file)

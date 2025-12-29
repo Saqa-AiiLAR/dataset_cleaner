@@ -30,6 +30,17 @@ logger = logging.getLogger("SaqaParser.word_healer")
 # Special marker for word boundaries (must be unique and unlikely to appear in text)
 WORD_BOUNDARY_MARKER = "__WORD_BOUNDARY__"
 
+# Pre-compiled regex patterns for performance
+_MULTI_SPACE_PATTERN = re.compile(r'\s{2,}')
+_WHITESPACE_PATTERN = re.compile(r'\s+')
+_NUMERIC_PATTERN = re.compile(r'\d+[\s\-\.]?\d*')
+
+# Build Cyrillic pattern once
+_cyrillic_chars = ''.join(SAKHA_ALL_CHARS)
+_CYRILLIC_PATTERN = re.compile(rf'[а-яё{re.escape(_cyrillic_chars)}]', re.IGNORECASE)
+_STRICT_MERGE_PATTERN = re.compile(rf'\b([а-яё{re.escape(_cyrillic_chars)}])\s+([а-яё{re.escape(_cyrillic_chars)}])\b', re.IGNORECASE)
+_FALSE_HYPHEN_PATTERN = re.compile(r'(\w+)-(\s+)(\w+)')
+
 
 class WordHealer:
     """Repairs OCR-broken Sakha words with smart normalization and merging."""
@@ -96,7 +107,7 @@ class WordHealer:
             Text with word boundaries marked
         """
         # Replace 2+ spaces with [[BLOCK]] marker
-        text = re.sub(r'\s{2,}', f' {WORD_BLOCK_MARKER} ', text)
+        text = _MULTI_SPACE_PATTERN.sub(f' {WORD_BLOCK_MARKER} ', text)
         return text
     
     def restore_word_boundaries(self, text: str) -> str:
@@ -116,7 +127,7 @@ class WordHealer:
         # Replace old __WORD_BOUNDARY__ marker for backward compatibility
         text = text.replace(WORD_BOUNDARY_MARKER, "")
         # Normalize multiple spaces to single space
-        text = re.sub(r'\s+', ' ', text)
+        text = _WHITESPACE_PATTERN.sub(' ', text)
         return text
     
     def smart_normalize(self, text: str) -> str:
@@ -134,17 +145,12 @@ class WordHealer:
         """
         # First, identify and protect numeric sequences
         # Pattern matches numbers, dates, phone numbers, ISBN, etc.
-        numeric_pattern = r'\d+[\s\-\.]?\d*'
-        numeric_matches = list(re.finditer(numeric_pattern, text))
+        numeric_matches = list(_NUMERIC_PATTERN.finditer(text))
         
         # Create a set of protected character positions
         protected_positions: Set[int] = set()
         for match in numeric_matches:
             protected_positions.update(range(match.start(), match.end()))
-        
-        # Build Cyrillic character set for context matching
-        cyrillic_chars = ''.join(SAKHA_ALL_CHARS)
-        cyrillic_pattern = rf'[а-яё{re.escape(cyrillic_chars)}]'
         
         # Apply normalization for each character in the map
         result_chars = list(text)
@@ -160,13 +166,13 @@ class WordHealer:
                     
                     # Check before (look back up to 2 chars for Cyrillic)
                     for j in range(max(0, i - 2), i):
-                        if re.match(cyrillic_pattern, result_chars[j], re.IGNORECASE):
+                        if _CYRILLIC_PATTERN.match(result_chars[j]):
                             before_match = True
                             break
                     
                     # Check after (look ahead up to 2 chars for Cyrillic)
                     for j in range(i + 1, min(len(result_chars), i + 3)):
-                        if re.match(cyrillic_pattern, result_chars[j], re.IGNORECASE):
+                        if _CYRILLIC_PATTERN.match(result_chars[j]):
                             after_match = True
                             break
                     
@@ -201,13 +207,11 @@ class WordHealer:
             Number of consecutive consonants
         """
         count = 0
-        cyrillic_chars = ''.join(SAKHA_ALL_CHARS)
-        cyrillic_pattern = rf'[а-яё{re.escape(cyrillic_chars)}]'
         
         for i in range(start_pos, len(text)):
             char = text[i]
             # Only count Cyrillic letters (not spaces, punctuation, etc.)
-            if re.match(cyrillic_pattern, char, re.IGNORECASE):
+            if _CYRILLIC_PATTERN.match(char):
                 if not self._is_vowel(char):
                     count += 1
                 else:
@@ -279,16 +283,6 @@ class WordHealer:
         blocks = text.split(WORD_BLOCK_MARKER)
         processed_blocks = []
         
-        # Build pattern for Cyrillic characters
-        cyrillic_chars = ''.join(SAKHA_ALL_CHARS)
-        cyrillic_pattern = rf'[а-яё{re.escape(cyrillic_chars)}]'
-        
-        # Strict pattern: only merge single characters with word boundaries
-        # \b[Char]\s+[Char]\b - matches and consumes single char, space(s), single char at word boundaries
-        # This ensures we only merge "с а х а" -> "саха", not "саха тыла" -> "сахатыла"
-        # Note: Changed from lookahead to consuming pattern to avoid duplication bug
-        strict_merge_pattern = rf'\b({cyrillic_pattern})\s+({cyrillic_pattern})\b'
-        
         for block in blocks:
             block_text = block
             previous_length = len(block_text)
@@ -307,7 +301,7 @@ class WordHealer:
                     # Look backwards for word start
                     word_start = match_start
                     for i in range(match_start - 1, -1, -1):
-                        if i < len(block_text) and re.match(cyrillic_pattern, block_text[i], re.IGNORECASE):
+                        if i < len(block_text) and _CYRILLIC_PATTERN.match(block_text[i]):
                             word_start = i
                         else:
                             break
@@ -315,7 +309,7 @@ class WordHealer:
                     # Look forwards for word end (match_end now includes char2 since pattern consumes it)
                     word_end = match_end
                     for i in range(match_end, len(block_text)):
-                        if i < len(block_text) and re.match(cyrillic_pattern, block_text[i], re.IGNORECASE):
+                        if i < len(block_text) and _CYRILLIC_PATTERN.match(block_text[i]):
                             word_end = i + 1
                         else:
                             break
@@ -354,7 +348,7 @@ class WordHealer:
                     return merged_chars
                 
                 # Apply strict merge pattern with validation
-                block_text = re.sub(strict_merge_pattern, merge_with_validation, block_text)
+                block_text = _STRICT_MERGE_PATTERN.sub(merge_with_validation, block_text)
                 
                 current_length = len(block_text)
                 
@@ -384,7 +378,6 @@ class WordHealer:
         """
         # Pattern: word-hyphen-space-word
         # Only merge if both parts contain Sakha characters
-        pattern = r'(\w+)-(\s+)(\w+)'
         
         def should_merge(match) -> bool:
             part1, spaces, part2 = match.groups()
@@ -402,7 +395,7 @@ class WordHealer:
                 return match.group(1) + match.group(3)  # Merge without hyphen
             return match.group(0)  # Keep original
         
-        text = re.sub(pattern, replace_hyphen, text)
+        text = _FALSE_HYPHEN_PATTERN.sub(replace_hyphen, text)
         return text
     
     def heal_text(self, text: str) -> str:

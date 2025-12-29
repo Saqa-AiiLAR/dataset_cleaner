@@ -31,12 +31,12 @@ class TestPDFProcessor(unittest.TestCase):
     def test_processor_initialization_with_valid_folders(self):
         """Test PDFProcessor initialization with valid folders."""
         processor = PDFProcessor(
-            source_folder=self.source_folder,
+            input_folder=self.source_folder,
             archive_folder=self.archive_folder,
             output_file=self.output_file,
             log_file=self.log_file
         )
-        self.assertEqual(processor.source_folder, self.source_folder)
+        self.assertEqual(processor.input_folder, self.source_folder)
         self.assertEqual(processor.archive_folder, self.archive_folder)
         # Archive folder should be created
         self.assertTrue(self.archive_folder.exists())
@@ -45,7 +45,7 @@ class TestPDFProcessor(unittest.TestCase):
         """Test PDFProcessor initialization with missing source folder."""
         with self.assertRaises(MissingFileError):
             PDFProcessor(
-                source_folder=Path(self.temp_dir) / "nonexistent",
+                input_folder=Path(self.temp_dir) / "nonexistent",
                 archive_folder=self.archive_folder,
                 output_file=self.output_file,
                 log_file=self.log_file
@@ -55,7 +55,7 @@ class TestPDFProcessor(unittest.TestCase):
         """Test that processor creates archive folder if it doesn't exist."""
         archive_path = Path(self.temp_dir) / "new_archive"
         processor = PDFProcessor(
-            source_folder=self.source_folder,
+            input_folder=self.source_folder,
             archive_folder=archive_path,
             output_file=self.output_file,
             log_file=self.log_file
@@ -66,7 +66,7 @@ class TestPDFProcessor(unittest.TestCase):
     def test_extract_text_from_pdf_with_nonexistent_file(self):
         """Test extract_text_from_pdf with nonexistent file."""
         processor = PDFProcessor(
-            source_folder=self.source_folder,
+            input_folder=self.source_folder,
             archive_folder=self.archive_folder,
             output_file=self.output_file,
             log_file=self.log_file
@@ -78,7 +78,7 @@ class TestPDFProcessor(unittest.TestCase):
     def test_extract_text_from_pdf_with_non_pdf_file(self):
         """Test extract_text_from_pdf with non-PDF file."""
         processor = PDFProcessor(
-            source_folder=self.source_folder,
+            input_folder=self.source_folder,
             archive_folder=self.archive_folder,
             output_file=self.output_file,
             log_file=self.log_file
@@ -94,7 +94,7 @@ class TestPDFProcessor(unittest.TestCase):
     def test_process_all_pdfs_with_empty_folder(self):
         """Test process_all_pdfs with empty source folder."""
         processor = PDFProcessor(
-            source_folder=self.source_folder,
+            input_folder=self.source_folder,
             archive_folder=self.archive_folder,
             output_file=self.output_file,
             log_file=self.log_file
