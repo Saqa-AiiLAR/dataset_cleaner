@@ -108,6 +108,105 @@ class TextCleaner(BaseProcessor):
         # Join the matches back together
         return ''.join(matches)
     
+    def filter_invalid_words(self, text: str) -> str:
+        """
+        Filter out invalid words from text:
+        - Single-letter words (Yakut language has no single-letter words)
+        - Abbreviations (words with dots, short uppercase words)
+        - Words where all letters are separated by spaces
+        - English words (words consisting only of Latin letters)
+        - Roman numerals (sequences of I, V, X, L, C, D, M)
+        
+        Args:
+            text: Input text
+        
+        Returns:
+            Text with invalid words removed
+        """
+        # Track statistics
+        single_letter_count = 0
+        abbreviation_count = 0
+        spaced_letters_count = 0
+        english_words_count = 0
+        roman_numerals_count = 0
+        
+        # Step 1: Remove words where all letters are separated by spaces
+        # Pattern: sequence of letters separated by spaces (e.g., "а б р е в")
+        spaced_letters_pattern = regex.compile(r'\b(?:\p{L}\s+)+\p{L}\b')
+        
+        def remove_spaced_letters(match):
+            nonlocal spaced_letters_count
+            spaced_letters_count += 1
+            return ''  # Remove the match
+        
+        text = spaced_letters_pattern.sub(remove_spaced_letters, text)
+        
+        # Normalize spaces after removing spaced letters
+        text = regex.sub(r'\s+', ' ', text).strip()
+        
+        # Step 2: Split text into words and filter
+        # Extract words (sequences of letters, possibly with dots at the end)
+        words = regex.findall(r'\p{L}+\.?', text)
+        
+        filtered_words = []
+        
+        for word in words:
+            word_stripped = word.strip()
+            
+            # Skip empty words
+            if not word_stripped:
+                continue
+            
+            # Filter 1: Remove single-letter words (all Unicode letters)
+            if len(word_stripped) == 1 and regex.match(r'\p{L}', word_stripped):
+                single_letter_count += 1
+                continue
+            
+            # Filter 2: Remove abbreviations with dots (e.g., "г.", "стр.", "т.д.")
+            if '.' in word_stripped:
+                abbreviation_count += 1
+                continue
+            
+            # Filter 3: Remove short uppercase words (2-5 characters, all uppercase Cyrillic)
+            # Pattern matches 2-5 uppercase Cyrillic letters
+            if regex.match(r'^[А-ЯЁ]{2,5}$', word_stripped):
+                abbreviation_count += 1
+                continue
+            
+            # Filter 4: Remove English words (words consisting only of Latin letters)
+            # Check if word contains only Latin letters (A-Z, a-z)
+            if regex.match(r'^[A-Za-z]+$', word_stripped):
+                english_words_count += 1
+                continue
+            
+            # Filter 5: Remove Roman numerals (sequences of I, V, X, L, C, D, M)
+            # Pattern matches sequences of Roman numeral characters
+            if regex.match(r'^[IVXLCDM]+$', word_stripped, regex.IGNORECASE):
+                roman_numerals_count += 1
+                continue
+            
+            # Keep the word
+            filtered_words.append(word_stripped)
+        
+        # Log statistics
+        if single_letter_count > 0:
+            logger.info(f"Removed {single_letter_count} single-letter word(s)")
+        if abbreviation_count > 0:
+            logger.info(f"Removed {abbreviation_count} abbreviation(s)")
+        if spaced_letters_count > 0:
+            logger.info(f"Removed {spaced_letters_count} word(s) with spaced letters")
+        if english_words_count > 0:
+            logger.info(f"Removed {english_words_count} English word(s)")
+        if roman_numerals_count > 0:
+            logger.info(f"Removed {roman_numerals_count} Roman numeral(s)")
+        
+        if (single_letter_count == 0 and abbreviation_count == 0 and spaced_letters_count == 0 
+            and english_words_count == 0 and roman_numerals_count == 0):
+            logger.debug("No invalid words found to filter")
+        
+        # Join filtered words back with spaces
+        return ' '.join(filtered_words)
+    
     def process(self) -> int:
         """
         Process text cleaning (implements BaseProcessor interface).
@@ -160,6 +259,12 @@ class TextCleaner(BaseProcessor):
             text_no_special = healer.heal_text(text_no_special)
             logger.info("Word healing complete.")
             step_num += 1
+        
+        # Step X: Filter invalid words (abbreviations, single letters, spaced letters)
+        logger.info(f"Step {step_num}: Filtering invalid words (abbreviations, single letters, spaced letters)...")
+        text_no_special = self.filter_invalid_words(text_no_special)
+        logger.info("Invalid words filtering complete.")
+        step_num += 1
         
         logger.info(f"Step {step_num}: Removing Russian words...")
         cleaned_text = self.remove_russian_words(text_no_special)
