@@ -66,34 +66,15 @@ pytest --version
 
 ## Initial Setup
 
-After installation, create the required workspace structure:
+Workspace directories are created automatically when you run any CLI command. 
+No manual setup is required!
 
-```bash
-python scripts/setup_workspace.py
-```
-
-This creates:
+The workspace structure includes:
 - `workspace/input/` - Place your PDF files here
 - `workspace/archive/` - Processed PDFs moved here
 - `workspace/logs/` - Log files stored here
 - `workspace/results/` - Timestamped output folders
 - `workspace/additional/` - Optional word lists for filtering
-
-### Setup Script Options
-
-```bash
-# Dry run (preview what will be created)
-python scripts/setup_workspace.py --dry-run
-
-# Include optional folders
-python scripts/setup_workspace.py --include-optional
-
-# Quiet mode
-python scripts/setup_workspace.py --quiet
-
-# Custom repository root
-python scripts/setup_workspace.py --root /path/to/repo
-```
 
 ## Dependencies
 
@@ -262,5 +243,4 @@ rm -rf SaqaParser
 
 - **[Usage Guide](USAGE.md)** - Learn how to use SaqaParser
 - **[Architecture](ARCHITECTURE.md)** - Understand how it works
-- **[Contributing](CONTRIBUTING.md)** - Start contributing
 

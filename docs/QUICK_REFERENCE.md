@@ -6,9 +6,10 @@ Fast reference for common tasks and commands.
 
 ```bash
 pip install -e ".[dev]"          # Install with dev tools
-python scripts/setup_workspace.py # Create workspace folders
-pre-commit install                # Set up git hooks
+pre-commit install                # Set up git hooks (optional)
 ```
+
+Note: Workspace folders are created automatically when you run CLI commands.
 
 ## Usage
 
@@ -133,7 +134,6 @@ git push origin feature/my-feature
 - **docs/INSTALLATION.md** - Setup guide
 - **docs/USAGE.md** - Advanced usage
 - **docs/ARCHITECTURE.md** - How it works
-- **docs/CONTRIBUTING.md** - Development guide
 
 ## Performance
 
@@ -159,5 +159,5 @@ saqa-clean        # cli/text_clean.py
 
 ## Version
 
-Current: **1.1.0** (see CHANGELOG.md)
+Current: **1.1.0**
 

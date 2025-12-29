@@ -10,7 +10,6 @@ A Python tool for extracting text from PDF files and cleaning Sakha (Yakut) lang
 git clone <repository-url>
 cd SaqaParser
 pip install -e ".[dev]"
-python scripts/setup_workspace.py
 ```
 
 ### Run
@@ -165,7 +164,6 @@ The tool uses a sophisticated **4-layer priority system** to distinguish Russian
 - **[Installation Guide](docs/INSTALLATION.md)** - Detailed setup instructions
 - **[Usage Guide](docs/USAGE.md)** - Advanced usage, configuration, troubleshooting
 - **[Architecture](docs/ARCHITECTURE.md)** - How it works under the hood
-- **[Contributing](docs/CONTRIBUTING.md)** - Development guide
 
 ## Testing
 
@@ -203,14 +201,6 @@ mypy src/ cli/
 
 See LICENSE file for details.
 
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
-
 ---
 
-**Quick Links:** [Installation](docs/INSTALLATION.md) | [Usage Guide](docs/USAGE.md) | [Architecture](docs/ARCHITECTURE.md) | [Contributing](docs/CONTRIBUTING.md)
+**Quick Links:** [Installation](docs/INSTALLATION.md) | [Usage Guide](docs/USAGE.md) | [Architecture](docs/ARCHITECTURE.md)

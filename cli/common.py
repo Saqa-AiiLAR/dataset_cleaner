@@ -13,6 +13,21 @@ from src.logging_config import setup_logging, disable_console_logging
 from src.exceptions import SaqaParserError
 
 
+def ensure_workspace_directories() -> None:
+    """
+    Ensure workspace directories exist, creating them if needed.
+    
+    This is called automatically when CLI commands start to avoid requiring
+    users to run setup_workspace.py manually.
+    """
+    try:
+        config.setup_directories()
+    except Exception:
+        # If automatic setup fails, processors will handle directory creation
+        # via their own validation, so we don't need to fail here
+        pass
+
+
 def setup_cli_logging(
     log_file: Optional[Path], verbose: bool = False, quiet: bool = False
 ) -> logging.Logger:
@@ -27,6 +42,9 @@ def setup_cli_logging(
     Returns:
         Configured logger instance
     """
+    # Ensure workspace directories exist before setting up logging
+    ensure_workspace_directories()
+    
     log_level = logging.DEBUG if verbose else logging.INFO
     logger = setup_logging(log_file or config.log_file, level=log_level)
     

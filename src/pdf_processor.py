@@ -3,6 +3,7 @@ PDF processing module for extracting text from PDF files.
 """
 import pdfplumber
 import shutil
+import regex
 from pathlib import Path
 from typing import List, Tuple, Optional
 import logging
@@ -13,6 +14,10 @@ from .exceptions import PDFProcessingError, ValidationError, MissingFileError
 from .base_processor import BaseProcessor
 
 logger = logging.getLogger("SaqaParser.pdf_processor")
+
+# Pre-compiled regex pattern for hyphenated line breaks
+# Matches: word ending with hyphen, optional whitespace, newline, optional whitespace, word continuation
+_HYPHENATED_LINE_BREAK_PATTERN = regex.compile(r'([\p{L}]+)-\s*\n\s*([\p{L}]+)', regex.UNICODE)
 
 
 class PDFProcessor(BaseProcessor):
@@ -90,6 +95,11 @@ class PDFProcessor(BaseProcessor):
                     if count >= 1:
                         page_word = "page" if count == 1 else "pages"
                         logger.warning(f"{count} {page_word}: {warning_msg}")
+                
+                # Merge hyphenated line breaks in the complete extracted text
+                extracted_text, merge_count = self._merge_hyphenated_line_breaks(extracted_text)
+                if merge_count > 0:
+                    logger.info(f"Merged {merge_count} hyphenated line break(s) in extracted text")
         
         except pdfplumber.exceptions.PDFSyntaxError as e:
             error_msg = f"Invalid PDF syntax in {pdf_path.name}: {str(e)}"
@@ -123,6 +133,41 @@ class PDFProcessor(BaseProcessor):
         
         single_char_words = sum(1 for w in words if len(w) == 1)
         return single_char_words / len(words)
+    
+    def _merge_hyphenated_line_breaks(self, text: str) -> Tuple[str, int]:
+        """
+        Merge words that are split across lines with hyphens.
+        
+        Detects pattern: word ending with hyphen, followed by newline, followed by word continuation.
+        Merges them into a single word by removing the hyphen, newline, and any whitespace.
+        
+        Example: "word-\ncontinues" → "wordcontinues"
+        
+        Args:
+            text: Extracted text that may contain hyphenated line breaks
+            
+        Returns:
+            Tuple of (merged_text, count_of_merges)
+        """
+        if not text:
+            return text, 0
+        
+        merge_count = 0
+        
+        def merge_match(match):
+            """Replace hyphenated line break with merged word."""
+            nonlocal merge_count
+            merge_count += 1
+            # Group 1: word part before hyphen
+            # Group 2: word continuation after newline
+            return match.group(1) + match.group(2)
+        
+        merged_text = _HYPHENATED_LINE_BREAK_PATTERN.sub(merge_match, text)
+        
+        if merge_count > 0:
+            logger.debug(f"Merged {merge_count} hyphenated line break(s)")
+        
+        return merged_text, merge_count
     
     def _extract_page_text_adaptive(self, page, page_num: int, warning_counts: dict) -> Tuple[str, Optional[str]]:
         """

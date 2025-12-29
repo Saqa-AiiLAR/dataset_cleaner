@@ -486,5 +486,4 @@ Common causes:
 ## Next Steps
 
 - **[Architecture Guide](ARCHITECTURE.md)** - Understand how it works
-- **[Contributing Guide](CONTRIBUTING.md)** - Contribute to the project
 
