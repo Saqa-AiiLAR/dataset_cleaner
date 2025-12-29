@@ -12,7 +12,6 @@ import re
 import logging
 from pathlib import Path
 from typing import List, Set, Optional, Match
-import re
 
 from .config import config
 from .constants import (
@@ -20,6 +19,10 @@ from .constants import (
     SAKHA_ALL_CHARS,
     SAKHA_ANCHOR_CHARS,
     WORD_HEALER_EXCEPTIONS,
+    WORD_BLOCK_MARKER,
+    SAKHA_VOWELS,
+    MAX_WORD_LENGTH,
+    MAX_CONSONANT_SEQUENCE,
 )
 
 logger = logging.getLogger("SaqaParser.word_healer")
@@ -83,7 +86,7 @@ class WordHealer:
         """
         Mark double/multiple spaces as word boundaries.
         
-        Replaces multiple spaces with a special marker that will be restored
+        Replaces multiple spaces with [[BLOCK]] marker that will be restored
         after word repair to prevent merging separate words.
         
         Args:
@@ -92,13 +95,15 @@ class WordHealer:
         Returns:
             Text with word boundaries marked
         """
-        # Replace 2+ spaces with marker
-        text = re.sub(r'\s{2,}', f' {WORD_BOUNDARY_MARKER} ', text)
+        # Replace 2+ spaces with [[BLOCK]] marker
+        text = re.sub(r'\s{2,}', f' {WORD_BLOCK_MARKER} ', text)
         return text
     
     def restore_word_boundaries(self, text: str) -> str:
         """
-        Restore word boundaries by replacing marker with single space.
+        Restore word boundaries by replacing markers with single space.
+        
+        Handles both [[BLOCK]] and __WORD_BOUNDARY__ markers for backward compatibility.
         
         Args:
             text: Text with word boundary markers
@@ -106,7 +111,9 @@ class WordHealer:
         Returns:
             Text with boundaries restored
         """
-        # Replace marker with single space
+        # Replace [[BLOCK]] marker with single space
+        text = text.replace(WORD_BLOCK_MARKER, "")
+        # Replace old __WORD_BOUNDARY__ marker for backward compatibility
         text = text.replace(WORD_BOUNDARY_MARKER, "")
         # Normalize multiple spaces to single space
         text = re.sub(r'\s+', ' ', text)
@@ -170,12 +177,93 @@ class WordHealer:
         
         return ''.join(result_chars)
     
+    def _is_vowel(self, char: str) -> bool:
+        """
+        Check if a character is a vowel.
+        
+        Args:
+            char: Character to check
+            
+        Returns:
+            True if character is a vowel
+        """
+        return char in SAKHA_VOWELS
+    
+    def _count_consonants_in_sequence(self, text: str, start_pos: int) -> int:
+        """
+        Count consecutive consonants starting from a position.
+        
+        Args:
+            text: Text to analyze
+            start_pos: Starting position
+            
+        Returns:
+            Number of consecutive consonants
+        """
+        count = 0
+        cyrillic_chars = ''.join(SAKHA_ALL_CHARS)
+        cyrillic_pattern = rf'[а-яё{re.escape(cyrillic_chars)}]'
+        
+        for i in range(start_pos, len(text)):
+            char = text[i]
+            # Only count Cyrillic letters (not spaces, punctuation, etc.)
+            if re.match(cyrillic_pattern, char, re.IGNORECASE):
+                if not self._is_vowel(char):
+                    count += 1
+                else:
+                    break  # Stop at first vowel
+            else:
+                # Non-letter character - stop counting
+                break
+        
+        return count
+    
+    def _check_phonetic_validity(self, word: str) -> bool:
+        """
+        Check if word has valid phonetics (not too many consecutive consonants).
+        
+        Args:
+            word: Word to check
+            
+        Returns:
+            True if word has valid phonetics (no 10+ consecutive consonants)
+        """
+        for i in range(len(word)):
+            consonant_count = self._count_consonants_in_sequence(word, i)
+            if consonant_count >= MAX_CONSONANT_SEQUENCE:
+                logger.debug(f"Phonetic check failed: {consonant_count} consecutive consonants in '{word}'")
+                return False
+        return True
+    
+    def _check_length_validity(self, word: str) -> bool:
+        """
+        Check if word length is within limits.
+        
+        Bypasses check if word contains Sakha anchor characters.
+        
+        Args:
+            word: Word to check
+            
+        Returns:
+            True if word length is valid (<= 25) or contains Sakha anchor characters
+        """
+        # Bypass length check if word contains Sakha anchor characters
+        if any(char in word for char in SAKHA_ANCHOR_CHARS):
+            return True
+        
+        if len(word) > MAX_WORD_LENGTH:
+            logger.debug(f"Length check failed: word '{word}' exceeds {MAX_WORD_LENGTH} characters")
+            return False
+        
+        return True
+    
     def repair_broken_words(self, text: str, max_passes: int = None) -> str:
         """
-        Merge single letters separated by single spaces.
+        Merge single letters separated by single spaces using strict word boundaries.
         
-        Uses multiple passes with early termination to prevent infinite loops.
-        Validates merged words by checking for Sakha anchor characters.
+        Only merges standalone single characters (not complete words).
+        Validates merged words with length and phonetic checks.
+        Processes text in blocks separated by [[BLOCK]] markers.
         
         Args:
             text: Input text with potentially broken words
@@ -187,31 +275,100 @@ class WordHealer:
         if max_passes is None:
             max_passes = config.word_healer_passes
         
-        previous_length = len(text)
+        # Split text into blocks by [[BLOCK]] marker
+        blocks = text.split(WORD_BLOCK_MARKER)
+        processed_blocks = []
         
         # Build pattern for Cyrillic characters
         cyrillic_chars = ''.join(SAKHA_ALL_CHARS)
         cyrillic_pattern = rf'[а-яё{re.escape(cyrillic_chars)}]'
         
-        # Pattern: single Cyrillic letter, space(s), another Cyrillic letter
-        # Only merge if it's a single space (not word boundary marker)
-        merge_pattern = rf'({cyrillic_pattern})\s+(?={cyrillic_pattern})'
+        # Strict pattern: only merge single characters with word boundaries
+        # \b[Char]\s+[Char]\b - matches and consumes single char, space(s), single char at word boundaries
+        # This ensures we only merge "с а х а" -> "саха", not "саха тыла" -> "сахатыла"
+        # Note: Changed from lookahead to consuming pattern to avoid duplication bug
+        strict_merge_pattern = rf'\b({cyrillic_pattern})\s+({cyrillic_pattern})\b'
         
-        for pass_num in range(max_passes):
-            # Don't merge across word boundaries
-            # Replace: letter-space-letter -> letterletter (only single spaces)
-            text = re.sub(merge_pattern, r'\1', text)
+        for block in blocks:
+            block_text = block
+            previous_length = len(block_text)
             
-            current_length = len(text)
+            for pass_num in range(max_passes):
+                def merge_with_validation(match: Match) -> str:
+                    """Merge single characters with validation."""
+                    char1 = match.group(1)
+                    char2 = match.group(2)
+                    
+                    # Get the position in the current block_text
+                    match_start = match.start()
+                    match_end = match.end()
+                    
+                    # Find word boundaries: look for the full word that would contain this merge
+                    # Look backwards for word start
+                    word_start = match_start
+                    for i in range(match_start - 1, -1, -1):
+                        if i < len(block_text) and re.match(cyrillic_pattern, block_text[i], re.IGNORECASE):
+                            word_start = i
+                        else:
+                            break
+                    
+                    # Look forwards for word end (match_end now includes char2 since pattern consumes it)
+                    word_end = match_end
+                    for i in range(match_end, len(block_text)):
+                        if i < len(block_text) and re.match(cyrillic_pattern, block_text[i], re.IGNORECASE):
+                            word_end = i + 1
+                        else:
+                            break
+                    
+                    # Extract the current word (with spaces) - now includes both chars since pattern consumes char2
+                    current_word_with_spaces = block_text[word_start:word_end]
+                    
+                    # Simulate the merge: replace the matched pattern with merged chars
+                    # The match consumed: char1 + spaces + char2
+                    # We want to replace it with: char1 + char2 (no spaces)
+                    merged_chars = char1 + char2
+                    # Build the potential word with the merge applied
+                    potential_word_with_spaces = (
+                        block_text[word_start:match_start] + 
+                        merged_chars + 
+                        block_text[match_end:word_end]
+                    )
+                    
+                    # Remove all spaces to get the clean word for validation
+                    potential_word_clean = re.sub(r'\s+', '', potential_word_with_spaces)
+                    
+                    # Skip validation if word is empty or too short
+                    if len(potential_word_clean) <= 1:
+                        return merged_chars
+                    
+                    # Check validity
+                    if not self._check_length_validity(potential_word_clean):
+                        logger.debug(f"Rollback: length check failed for '{potential_word_clean}'")
+                        return match.group(0)  # Don't merge - return original
+                    
+                    if not self._check_phonetic_validity(potential_word_clean):
+                        logger.debug(f"Rollback: phonetic check failed for '{potential_word_clean}'")
+                        return match.group(0)  # Don't merge - return original
+                    
+                    # Merge is valid - return merged chars (char2 was consumed by pattern, so no duplication)
+                    return merged_chars
+                
+                # Apply strict merge pattern with validation
+                block_text = re.sub(strict_merge_pattern, merge_with_validation, block_text)
+                
+                current_length = len(block_text)
+                
+                # Early termination: if length stopped decreasing, no more improvement
+                if current_length >= previous_length:
+                    logger.debug(f"Early termination at pass {pass_num + 1} (no length change)")
+                    break
+                
+                previous_length = current_length
             
-            # Early termination: if length stopped decreasing, no more improvement
-            if current_length >= previous_length:
-                logger.debug(f"Early termination at pass {pass_num + 1} (no length change)")
-                break
-            
-            previous_length = current_length
+            processed_blocks.append(block_text)
         
-        return text
+        # Join blocks back together with [[BLOCK]] marker
+        return WORD_BLOCK_MARKER.join(processed_blocks)
     
     def remove_false_hyphens(self, text: str) -> str:
         """

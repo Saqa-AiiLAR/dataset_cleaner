@@ -74,3 +74,18 @@ WORD_HEALER_EXCEPTIONS: List[str] = [
     # and handled with word boundary protection
 ]
 
+# Word healer boundary and validation constants
+WORD_BLOCK_MARKER: str = "[[BLOCK]]"  # Marker for multi-space word boundaries
+
+# Sakha vowels (Cyrillic + Sakha-specific vowels and their uppercase variants)
+SAKHA_VOWELS: Set[str] = {
+    'а', 'э', 'и', 'о', 'у', 'ы', 'е', 'ё', 'ю', 'я',  # Standard Cyrillic vowels
+    'ө', 'ү',  # Sakha-specific vowels
+    'А', 'Э', 'И', 'О', 'У', 'Ы', 'Е', 'Ё', 'Ю', 'Я',  # Uppercase Cyrillic
+    'Ө', 'Ү',  # Uppercase Sakha vowels
+}
+
+# Word healer validation limits
+MAX_WORD_LENGTH: int = 25  # Maximum word length during merging
+MAX_CONSONANT_SEQUENCE: int = 10  # Maximum consecutive consonants before rollback
+

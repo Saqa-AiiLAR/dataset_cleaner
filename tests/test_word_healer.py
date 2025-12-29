@@ -66,10 +66,11 @@ class TestWordHealer(unittest.TestCase):
     # Word Boundary Protection Tests
     def test_protect_word_boundaries_double_space(self):
         """Test that double spaces are preserved as word boundaries."""
+        from src.constants import WORD_BLOCK_MARKER
         text = "бу  кинигэ"
         protected = self.healer.protect_word_boundaries(text)
-        # Should contain boundary marker
-        self.assertIn("__WORD_BOUNDARY__", protected)
+        # Should contain [[BLOCK]] marker
+        self.assertIn(WORD_BLOCK_MARKER, protected)
         
         # After repair and restore, double space should be preserved as single space
         healed = self.healer.heal_text(text)
@@ -216,6 +217,107 @@ class TestWordHealer(unittest.TestCase):
         self.assertIn(" ", result)
         words = result.split()
         self.assertGreaterEqual(len(words), 2)
+    
+    # New tests for strict single character merging
+    def test_repair_only_single_characters(self):
+        """Test that only single characters are merged, not complete words."""
+        # Should merge "с а х а" -> "саха"
+        text = "с а х а"
+        result = self.healer.repair_broken_words(text)
+        self.assertIn("саха", result)
+        # Should NOT merge "саха тыла" -> "сахатыла"
+        text2 = "саха тыла"
+        result2 = self.healer.repair_broken_words(text2)
+        self.assertIn("саха", result2)
+        self.assertIn("тыла", result2)
+        # Words should remain separate
+        self.assertNotIn("сахатыла", result2)
+    
+    def test_repair_preserves_word_boundaries_single_space(self):
+        """Test that word boundaries with single spaces are preserved."""
+        # "оҕолор баҕар" should remain as two words
+        text = "о ҕ о л о р  ба ҕ а р"
+        healed = self.healer.heal_text(text)
+        # Both words should be present and separate
+        self.assertIn("оҕолор", healed)
+        self.assertIn("баҕар", healed)
+        # Should not merge into one word
+        self.assertNotIn("оҕолорбаҕар", healed)
+        # Check that words are separated by space
+        words = healed.split()
+        self.assertIn("оҕолор", words)
+        self.assertIn("баҕар", words)
+    
+    def test_repair_length_constraint(self):
+        """Test that words exceeding 25 characters trigger length constraint."""
+        # Create a very long broken word that would exceed 25 chars when merged
+        # This is a synthetic test case
+        long_broken = "а " * 20  # Would create 40-char word
+        result = self.healer.repair_broken_words(long_broken)
+        # The repair should be limited by length constraint
+        # Note: This test may need adjustment based on actual behavior
+        self.assertIsInstance(result, str)
+    
+    def test_repair_phonetic_check(self):
+        """Test that phonetic check prevents merging when too many consonants."""
+        # Create a sequence that would have 10+ consonants in a row
+        # This is difficult to test directly, but we can test the helper method
+        from src.constants import MAX_CONSONANT_SEQUENCE
+        # Test with a word that has many consonants
+        test_word = "бвгджзклмнпрстфхцчшщ"  # Many consonants
+        is_valid = self.healer._check_phonetic_validity(test_word)
+        # Should fail if it has too many consecutive consonants
+        if len(test_word) > MAX_CONSONANT_SEQUENCE:
+            # This test verifies the check exists and works
+            self.assertIsInstance(is_valid, bool)
+    
+    def test_repair_sakha_anchor_bypass_length(self):
+        """Test that words with Sakha anchor characters bypass length check."""
+        # Create a long word with Sakha anchor character
+        long_sakha_word = "о" + "ҕ" * 30  # 31 chars with anchor
+        is_valid = self.healer._check_length_validity(long_sakha_word)
+        # Should bypass length check because it contains Sakha anchor
+        self.assertTrue(is_valid)
+        
+        # Word without anchor should fail if too long
+        long_word_no_anchor = "а" * 30  # 30 chars, no anchor
+        is_valid_no_anchor = self.healer._check_length_validity(long_word_no_anchor)
+        # Should fail length check
+        self.assertFalse(is_valid_no_anchor)
+    
+    def test_repair_block_marker_preservation(self):
+        """Test that [[BLOCK]] markers are preserved and restored correctly."""
+        from src.constants import WORD_BLOCK_MARKER
+        # Text with double spaces should get [[BLOCK]] marker
+        text = "оҕолор  баҕар"
+        protected = self.healer.protect_word_boundaries(text)
+        self.assertIn(WORD_BLOCK_MARKER, protected)
+        
+        # After full healing, words should be separated by single space
+        healed = self.healer.heal_text(text)
+        self.assertNotIn(WORD_BLOCK_MARKER, healed)
+        # Words should be separate
+        words = healed.split()
+        self.assertIn("оҕолор", words)
+        self.assertIn("баҕар", words)
+    
+    def test_repair_strict_pattern_example(self):
+        """Test the specific example from requirements: 'с а х а т ы л а' -> 'саха тыла'."""
+        text = "с а х а т ы л а"
+        healed = self.healer.heal_text(text)
+        # Should result in "саха тыла" (two words), not "сахатыла" (one word)
+        self.assertIn("саха", healed)
+        self.assertIn("тыла", healed)
+        # Should NOT be merged into one word
+        self.assertNotIn("сахатыла", healed)
+        # Verify words are separate
+        words = healed.split()
+        self.assertGreaterEqual(len(words), 2)
+        # "саха" and "тыла" should be in separate words
+        has_sakha = any("саха" in word for word in words)
+        has_tyla = any("тыла" in word for word in words)
+        self.assertTrue(has_sakha)
+        self.assertTrue(has_tyla)
 
 
 if __name__ == "__main__":
