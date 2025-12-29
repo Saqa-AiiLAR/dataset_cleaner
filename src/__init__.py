@@ -7,7 +7,7 @@ from .text_cleaner import TextCleaner
 from .base_processor import BaseProcessor
 from .language_detector import WordClassifier, get_classifier
 from .word_healer import WordHealer
-from .utils import setup_logging, validate_path, format_file_size, get_timestamp
+from .utils import validate_path, format_file_size, get_timestamp
 from .exceptions import (
     SaqaParserError,
     ConfigurationError,
@@ -29,7 +29,6 @@ __all__ = [
     "get_classifier",
     "WordHealer",
     "SAKHA_NORMALIZATION_MAP",
-    "setup_logging",
     "validate_path",
     "format_file_size",
     "get_timestamp",

@@ -18,7 +18,7 @@ logger = logging.getLogger("SaqaParser.pdf_processor")
 class PDFProcessor(BaseProcessor):
     """Handles PDF text extraction and file management."""
     
-    def __init__(self, source_folder: Optional[Path] = None, 
+    def __init__(self, input_folder: Optional[Path] = None, 
                  archive_folder: Optional[Path] = None,
                  output_file: Optional[Path] = None,
                  log_file: Optional[Path] = None):
@@ -26,18 +26,18 @@ class PDFProcessor(BaseProcessor):
         Initialize PDF processor.
         
         Args:
-            source_folder: Folder containing PDF files to process
+            input_folder: Folder containing PDF files to process
             archive_folder: Folder to move processed PDFs to
             output_file: File to append extracted text to
             log_file: File to write log entries to
         """
         super().__init__(log_file=log_file or config.log_file)
-        self.source_folder = source_folder or config.source_folder
+        self.input_folder = input_folder or config.input_folder
         self.archive_folder = archive_folder or config.archive_folder
         self.output_file = output_file or config.output_file
         
         # Validate and create paths using base class methods
-        self.validate_directory(self.source_folder, must_exist=True)
+        self.validate_directory(self.input_folder, must_exist=True)
         self.validate_directory(self.archive_folder, must_exist=False, create_if_missing=True)
         self.ensure_output_directory(self.output_file)
     
@@ -213,7 +213,8 @@ class PDFProcessor(BaseProcessor):
                     f.write(extracted_text)
                 logger.info(f"Extracted and saved text from {pdf_path.name} ({char_count} chars, {page_count} pages)")
             else:
-                logger.warning(f"No text extracted from {pdf_path.name}")
+                logger.warning(f"No text extracted from {pdf_path.name} - file may be empty or unreadable")
+                # Still continue processing even if no text extracted
             
             # Move to archive
             archive_path = self.archive_folder / pdf_path.name
@@ -248,9 +249,9 @@ class PDFProcessor(BaseProcessor):
         """
         timestamp = get_timestamp()
         if error:
-            log_entry = f"pdf_insert.py - {filename} - {timestamp} - ERROR: {error}\n"
+            log_entry = f"PDFProcessor - {filename} - {timestamp} - ERROR: {error}\n"
         else:
-            log_entry = f"pdf_insert.py - {filename} - {timestamp} - {char_count} chars - {file_size} bytes - {page_count} pages\n"
+            log_entry = f"PDFProcessor - {filename} - {timestamp} - {char_count} chars - {file_size} bytes - {page_count} pages\n"
         
         with open(self.log_file, "a", encoding="utf-8") as f:
             f.write(log_entry)
@@ -271,10 +272,10 @@ class PDFProcessor(BaseProcessor):
         Returns:
             Number of files processed successfully
         """
-        pdf_files = list(self.source_folder.glob("*.pdf"))
+        pdf_files = list(self.input_folder.glob("*.pdf"))
         
         if not pdf_files:
-            logger.warning("No PDF files found in source folder.")
+            logger.warning(f"No PDF files found in input folder: {self.input_folder}")
             return 0
         
         total_pdfs = len(pdf_files)

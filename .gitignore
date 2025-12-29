@@ -210,14 +210,9 @@ __marimo__/
 # Project-specific output files
 saqa.txt
 saqaCleaned.txt
-logs
-results/
 
-# PDF files (large files, typically processed)
-*.pdf
-archive/*
-!archive/.gitkeep
-# Note: source/ folder is tracked (not ignored) so folder structure is preserved
+# Workspace folder (contains all working directories)
+workspace/
 
 # IDE and Editor files
 .vscode/
@@ -225,6 +220,12 @@ archive/*
 .project
 .pydevproject
 .settings/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.vim/
 
 # OS-specific files
 .DS_Store
@@ -243,9 +244,13 @@ desktop.ini
 *.backup
 *.orig
 *.rej
-*.swo
-*.swp
-*~
+*.log
+*.cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
 # Source files for scripts (text and PDF files used as input)
 *.txt

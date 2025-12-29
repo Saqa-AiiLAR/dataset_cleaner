@@ -257,7 +257,7 @@ class WordHealer:
         
         return True
     
-    def repair_broken_words(self, text: str, max_passes: int = None) -> str:
+    def repair_broken_words(self, text: str, max_passes: Optional[int] = None) -> str:
         """
         Merge single letters separated by single spaces using strict word boundaries.
         
@@ -294,7 +294,7 @@ class WordHealer:
             previous_length = len(block_text)
             
             for pass_num in range(max_passes):
-                def merge_with_validation(match: Match) -> str:
+                def merge_with_validation(match: Match[str]) -> str:
                     """Merge single characters with validation."""
                     char1 = match.group(1)
                     char2 = match.group(2)
@@ -397,7 +397,7 @@ class WordHealer:
                 return True
             return False
         
-        def replace_hyphen(match) -> str:
+        def replace_hyphen(match: Match[str]) -> str:
             if should_merge(match):
                 return match.group(1) + match.group(3)  # Merge without hyphen
             return match.group(0)  # Keep original

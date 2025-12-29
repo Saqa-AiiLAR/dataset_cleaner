@@ -1,3 +1,0 @@
-# This file ensures the archive/ folder is tracked in Git
-# PDF files placed here will be ignored by .gitignore rules, but the folder structure is preserved
-

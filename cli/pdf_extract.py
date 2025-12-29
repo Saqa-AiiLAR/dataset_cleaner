@@ -1,6 +1,6 @@
 """
 Entry point for PDF text extraction.
-Extracts text from PDF files in source/ folder and appends to saqa.txt.
+Extracts text from PDF files in workspace/input/ folder and appends to saqa.txt.
 """
 import argparse
 import sys
@@ -21,16 +21,16 @@ def main():
         epilog="""
 Examples:
   %(prog)s
-  %(prog)s --source ./my_pdfs --output ./output.txt
+  %(prog)s --input ./my_pdfs --output ./output.txt
   %(prog)s --verbose
         """
     )
     
     parser.add_argument(
-        "--source",
+        "--input",
         type=Path,
         default=None,
-        help=f"Source folder containing PDF files (default: {config.source_folder})"
+        help=f"Input folder containing PDF files (default: {config.input_folder})"
     )
     
     parser.add_argument(
@@ -78,7 +78,7 @@ Examples:
     try:
         # Create processor with custom paths if provided
         processor = PDFProcessor(
-            source_folder=args.source,
+            input_folder=args.input,
             archive_folder=args.archive,
             output_file=args.output,
             log_file=args.log

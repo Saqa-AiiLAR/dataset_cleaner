@@ -3,28 +3,8 @@ Utility functions for SaqaParser project.
 """
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
-
-
-# Deprecated: Use src.logging_config.setup_logging instead
-def setup_logging(log_file: Path, level: int = logging.INFO) -> logging.Logger:
-    """
-    Set up logging configuration (DEPRECATED).
-    
-    This function is deprecated. Use src.logging_config.setup_logging instead.
-    
-    Args:
-        log_file: Path to the log file
-        level: Logging level (default: INFO)
-    
-    Returns:
-        Configured logger instance
-    """
-    from .logging_config import setup_logging as _setup_logging
-    return _setup_logging(log_file, level=level, console=True)
 
 
 def validate_path(path: Path, must_exist: bool = True, must_be_file: bool = False) -> bool:
@@ -89,17 +69,3 @@ def get_timestamp_folder_name() -> str:
     return datetime.now().strftime("%d-%m-%y-%H-%M-%S")
 
 
-def add_error_context(error: Exception, context: str) -> Exception:
-    """
-    Add context to an error message.
-    
-    Args:
-        error: Original exception
-        context: Additional context to add
-    
-    Returns:
-        Exception with added context (same type as input)
-    """
-    error_type = type(error)
-    new_msg = f"{context}: {str(error)}"
-    return error_type(new_msg)

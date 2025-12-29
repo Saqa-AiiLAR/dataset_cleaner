@@ -96,16 +96,16 @@ python -m cli.run
 ```
 
 This will:
-- Create a timestamped folder in `results/` (format: `DD-MM-YY-HH-MM-SS`, e.g., `19-01-25-19-28-32`)
-- Extract text from all PDF files in `source/` folder
+- Create a timestamped folder in `workspace/results/` (format: `DD-MM-YY-HH-MM-SS`, e.g., `19-01-25-19-28-32`)
+- Extract text from all PDF files in `workspace/input/` folder
 - Clean the extracted text
 - Save `saqa.txt`, `saqaCleaned.txt`, and `logs` in the timestamped folder
-- Move processed PDFs to `archive/` folder
+- Move processed PDFs to `workspace/archive/` folder
 
 **With CLI options:**
 ```bash
-# Custom source and results paths
-saqa-run --source ./my_pdfs --results ./my_results
+# Custom input and results paths
+saqa-run --input ./my_pdfs --results ./my_results
 
 # Verbose mode for detailed logging
 saqa-run --verbose
@@ -114,12 +114,12 @@ saqa-run --verbose
 saqa-run --quiet
 
 # Full example with all options
-saqa-run --source ./pdfs --archive ./processed --results ./output --verbose
+saqa-run --input ./pdfs --archive ./processed --results ./output --verbose
 ```
 
 **Result structure:**
 ```
-results/
+workspace/results/
 ├── 19-01-25-19-28-32/
 │   ├── saqa.txt
 │   ├── saqaCleaned.txt
@@ -133,9 +133,9 @@ results/
 
 ### Option 2: Separate Steps
 
-#### Step 1: Extract Text from PDFs
+##### Step 1: Extract Text from PDFs
 
-Place PDF files in the `source/` folder, then run:
+Place PDF files in the `workspace/input/` folder, then run:
 
 **Basic usage:**
 ```bash
@@ -146,8 +146,8 @@ saqa-pdf-extract
 
 **With CLI options:**
 ```bash
-# Custom source and output paths
-python -m cli.pdf_extract --source ./my_pdfs --output ./output.txt
+# Custom input and output paths
+python -m cli.pdf_extract --input ./my_pdfs --output ./output.txt
 
 # Verbose mode for detailed logging
 python -m cli.pdf_extract --verbose
@@ -156,19 +156,19 @@ python -m cli.pdf_extract --verbose
 python -m cli.pdf_extract --quiet
 
 # Full example with all options
-python -m cli.pdf_extract --source ./pdfs --archive ./processed --output ./text.txt --log ./app.log --verbose
+python -m cli.pdf_extract --input ./pdfs --archive ./processed --output ./text.txt --log ./app.log --verbose
 ```
 
 **Using entry point (if installed):**
 ```bash
-saqa-pdf-extract --source ./my_pdfs --output ./output.txt
+saqa-pdf-extract --input ./my_pdfs --output ./output.txt
 ```
 
 This will:
-- Extract text from all PDF files in `source/` (or specified folder)
+- Extract text from all PDF files in `workspace/input/` (or specified folder)
 - Append extracted text to `saqa.txt` (or specified output file)
-- Move processed PDFs to `archive/` (or specified archive folder)
-- Log processing details to `logs` (or specified log file)
+- Move processed PDFs to `workspace/archive/` (or specified archive folder)
+- Log processing details to `workspace/logs` (or specified log file)
 
 #### Step 2: Clean the Extracted Text
 
@@ -207,25 +207,25 @@ This will:
 - **Apply word healing** to repair OCR-broken words (normalize characters, merge broken words)
 - Remove Russian words using multi-layer classification
 - Save cleaned text to `saqaCleaned.txt` (or specified output file)
-- Log processing details to `logs` (or specified log file)
+- Log processing details to `workspace/logs` (or specified log file)
 
 ### CLI Options
 
 #### saqa-run Options
 
-- `--source PATH` - Source folder containing PDF files (default: `source/`)
-- `--archive PATH` - Archive folder for processed PDFs (default: `archive/`)
-- `--results PATH` - Results folder for timestamped output (default: `results/`)
+- `--input PATH` - Input folder containing PDF files (default: `workspace/input/`)
+- `--archive PATH` - Archive folder for processed PDFs (default: `workspace/archive/`)
+- `--results PATH` - Results folder for timestamped output (default: `workspace/results/`)
 - `-v, --verbose` - Enable verbose logging (DEBUG level)
 - `-q, --quiet` - Suppress console output (only log to file)
 - `-h, --help` - Show help message
 
 #### pdf_extract Options
 
-- `--source PATH` - Source folder containing PDF files (default: `source/`)
-- `--archive PATH` - Archive folder for processed PDFs (default: `archive/`)
+- `--input PATH` - Input folder containing PDF files (default: `workspace/input/`)
+- `--archive PATH` - Archive folder for processed PDFs (default: `workspace/archive/`)
 - `--output PATH` - Output file for extracted text (default: `saqa.txt`)
-- `--log PATH` - Log file path (default: `logs`)
+- `--log PATH` - Log file path (default: `workspace/logs`)
 - `-v, --verbose` - Enable verbose logging (DEBUG level)
 - `-q, --quiet` - Suppress console output (only log to file)
 - `-h, --help` - Show help message
@@ -234,7 +234,7 @@ This will:
 
 - `--input PATH` - Input text file (default: `saqa.txt`)
 - `--output PATH` - Output cleaned text file (default: `saqaCleaned.txt`)
-- `--log PATH` - Log file path (default: `logs`)
+- `--log PATH` - Log file path (default: `workspace/logs`)
 - `-v, --verbose` - Enable verbose logging (DEBUG level)
 - `-q, --quiet` - Suppress console output (only log to file)
 - `-h, --help` - Show help message
@@ -260,10 +260,12 @@ SaqaParser/
 │   ├── test_text_cleaner.py
 │   ├── test_word_healer.py
 │   └── test_utils.py
-├── source/                  # Input folder for PDF files
-│   └── .gitkeep            # Preserves folder structure
-├── archive/                 # Output folder for processed PDFs
-│   └── .gitkeep            # Preserves folder structure
+├── workspace/               # Working directory for all project files
+│   ├── input/              # Input folder for PDF files (was source/)
+│   ├── archive/            # Output folder for processed PDFs
+│   ├── logs                # Log files
+│   └── results/             # Timestamped output folders (created by saqa-run)
+│       └── DD-MM-YY-HH-MM-SS/  # Individual run results
 ├── results/                 # Timestamped output folders (created by saqa-run)
 │   └── DD-MM-YY-HH-MM-SS/  # Individual run results
 ├── cli/                     # Command-line interface entry points
@@ -281,7 +283,7 @@ SaqaParser/
 
 Configuration is managed in `src/config.py`. You can modify:
 
-- **Folder paths**: `source_folder`, `archive_folder`
+- **Folder paths**: `input_folder`, `archive_folder`, `results_folder`
 - **File paths**: `output_file`, `cleaned_output_file`, `log_file`
 - **Processing settings**: 
   - `progress_interval_pages`: Show progress every N pages (default: 10)
@@ -311,7 +313,7 @@ from src.pdf_processor import PDFProcessor
 
 # Create custom configuration
 custom_config = Config(
-    source_folder=Path("my_pdfs"),
+    input_folder=Path("my_pdfs"),
     archive_folder=Path("my_archive"),
     progress_interval_pages=5,
     use_v_as_russian_marker=False,  # Disable 'в' as Russian marker
@@ -320,7 +322,7 @@ custom_config = Config(
 
 # Use custom configuration
 processor = PDFProcessor(
-    source_folder=custom_config.source_folder,
+    input_folder=custom_config.input_folder,
     archive_folder=custom_config.archive_folder
 )
 ```
@@ -336,7 +338,7 @@ from src.language_detector import WordClassifier
 
 # PDF extraction
 processor = PDFProcessor(
-    source_folder=Path("pdfs"),
+    input_folder=Path("pdfs"),
     archive_folder=Path("archived"),
     output_file=Path("extracted.txt")
 )
@@ -495,10 +497,10 @@ config.pdf_layout_mode = False
 
 ### Using saqa-run
 
-Results are saved in timestamped folders under `results/`:
-- **`results/DD-MM-YY-HH-MM-SS/saqa.txt`**: Raw extracted text from all processed PDFs
-- **`results/DD-MM-YY-HH-MM-SS/saqaCleaned.txt`**: Cleaned text with Russian words and special characters removed
-- **`results/DD-MM-YY-HH-MM-SS/logs`**: Processing log with timestamps and statistics
+Results are saved in timestamped folders under `workspace/results/`:
+- **`workspace/results/DD-MM-YY-HH-MM-SS/saqa.txt`**: Raw extracted text from all processed PDFs
+- **`workspace/results/DD-MM-YY-HH-MM-SS/saqaCleaned.txt`**: Cleaned text with Russian words and special characters removed
+- **`workspace/results/DD-MM-YY-HH-MM-SS/logs`**: Processing log with timestamps and statistics
 
 ### Using separate commands
 
@@ -576,7 +578,7 @@ The project uses modern Python packaging with `pyproject.toml`:
 ## Troubleshooting
 
 ### No PDF files found
-- Ensure PDF files are in the `source/` folder (or use `--source` option)
+- Ensure PDF files are in the `workspace/input/` folder (or use `--input` option)
 - Check file extensions are `.pdf` (case-sensitive)
 
 ### Language detection issues
@@ -624,7 +626,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
 
 ## Notes
 
-- PDF files are moved (not copied) to `archive/` after processing
-- The `source/` and `archive/` folders are preserved in Git but their contents are ignored
+- PDF files are moved (not copied) to `workspace/archive/` after processing
+- The `workspace/` folder and its contents are ignored by Git
 - Large files (PDFs, text files) are excluded from Git tracking
 - The tool uses lazy loading for heavy dependencies (pymorphy2, natasha) to improve startup performance

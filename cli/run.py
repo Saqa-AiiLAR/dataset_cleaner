@@ -23,16 +23,16 @@ def main():
         epilog="""
 Examples:
   %(prog)s
-  %(prog)s --source ./my_pdfs --verbose
+  %(prog)s --input ./my_pdfs --verbose
   %(prog)s --results ./my_results
         """
     )
     
     parser.add_argument(
-        "--source",
+        "--input",
         type=Path,
         default=None,
-        help=f"Source folder containing PDF files (default: {config.source_folder})"
+        help=f"Input folder containing PDF files (default: {config.input_folder})"
     )
     
     parser.add_argument(
@@ -92,7 +92,7 @@ Examples:
         # Step 1: Extract text from PDFs
         logger.info("Step 1: Extracting text from PDF files...")
         processor = PDFProcessor(
-            source_folder=args.source,
+            input_folder=args.input,
             archive_folder=args.archive,
             output_file=output_file,
             log_file=log_file

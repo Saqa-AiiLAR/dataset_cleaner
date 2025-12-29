@@ -8,10 +8,9 @@ import logging
 
 from .config import config
 from .utils import format_file_size, get_timestamp
-from .exceptions import TextCleaningError
+from .exceptions import TextCleaningError, MissingFileError
 from .language_detector import get_classifier
 from .base_processor import BaseProcessor
-from .exceptions import MissingFileError
 
 logger = logging.getLogger("SaqaParser.text_cleaner")
 
@@ -168,6 +167,10 @@ class TextCleaner(BaseProcessor):
         # Count characters in output
         char_count = len(cleaned_text)
         
+        # Check if result is empty
+        if not cleaned_text.strip():
+            logger.warning("Cleaned text is empty - no Sakha words found or all text was filtered")
+        
         logger.info(f"Writing cleaned text to {self.output_file}...")
         
         # Write output file
@@ -200,9 +203,9 @@ class TextCleaner(BaseProcessor):
         """
         timestamp = get_timestamp()
         if error:
-            log_entry = f"cleaner.py - {self.input_file.name} -> {self.output_file.name} - {timestamp} - ERROR: {error}\n"
+            log_entry = f"TextCleaner - {self.input_file.name} -> {self.output_file.name} - {timestamp} - ERROR: {error}\n"
         else:
-            log_entry = f"cleaner.py - {self.input_file.name} -> {self.output_file.name} - {timestamp} - {char_count} chars - {file_size} bytes\n"
+            log_entry = f"TextCleaner - {self.input_file.name} -> {self.output_file.name} - {timestamp} - {char_count} chars - {file_size} bytes\n"
         
         with open(self.log_file, "a", encoding="utf-8") as f:
             f.write(log_entry)

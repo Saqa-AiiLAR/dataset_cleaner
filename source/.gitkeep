@@ -1,3 +1,0 @@
-# This file ensures the source/ folder is tracked in Git
-# PDF files placed here will be ignored by *.pdf rule, but the folder structure is preserved
-

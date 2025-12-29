@@ -13,14 +13,14 @@ class Config:
     """Configuration settings for the SaqaParser application."""
     
     # Folder paths
-    source_folder: Path = field(default_factory=lambda: Path("source"))
-    archive_folder: Path = field(default_factory=lambda: Path("archive"))
-    results_folder: Path = field(default_factory=lambda: Path("results"))
+    input_folder: Path = field(default_factory=lambda: Path("workspace/input"))
+    archive_folder: Path = field(default_factory=lambda: Path("workspace/archive"))
+    results_folder: Path = field(default_factory=lambda: Path("workspace/results"))
     
     # File paths
     output_file: Path = field(default_factory=lambda: Path("saqa.txt"))
     cleaned_output_file: Path = field(default_factory=lambda: Path("saqaCleaned.txt"))
-    log_file: Path = field(default_factory=lambda: Path("logs"))
+    log_file: Path = field(default_factory=lambda: Path("workspace/logs"))
     
     # Processing settings
     progress_interval_pages: int = 10  # Show progress every N pages
@@ -48,7 +48,7 @@ class Config:
     
     def __post_init__(self) -> None:
         """Ensure all paths are Path objects."""
-        self.source_folder = Path(self.source_folder)
+        self.input_folder = Path(self.input_folder)
         self.archive_folder = Path(self.archive_folder)
         self.results_folder = Path(self.results_folder)
         self.output_file = Path(self.output_file)
@@ -70,8 +70,13 @@ class Config:
             ConfigurationError: If directories cannot be created
         """
         try:
+            # Create workspace structure
             self.archive_folder.mkdir(parents=True, exist_ok=True)
-            self.source_folder.mkdir(parents=True, exist_ok=True)
+            self.input_folder.mkdir(parents=True, exist_ok=True)
+            self.results_folder.mkdir(parents=True, exist_ok=True)
+            # Ensure log file directory exists
+            if self.log_file.parent:
+                self.log_file.parent.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             raise ConfigurationError(f"Cannot create required directories: {e}") from e
     
@@ -122,7 +127,7 @@ class Config:
 
 # Global configuration instance
 config = Config()
-# Setup directories automatically for backward compatibility
-# This can be disabled if needed by calling config.setup_directories() explicitly elsewhere
-config.setup_directories()
+# Note: setup_directories() is NOT called automatically to avoid side effects on import.
+# Directories will be created lazily when processors are initialized via BaseProcessor methods,
+# or can be created explicitly by calling config.setup_directories()
 
