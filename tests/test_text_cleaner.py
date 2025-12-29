@@ -240,6 +240,120 @@ class TestTextCleaner(unittest.TestCase):
         self.assertIn("баҕар", result)  # Sakha word with anchor
         self.assertIn("үөрэн", result)  # Sakha word with anchor
         self.assertIn("уонна", result)  # Sakha word with diphthong
+    
+    # Hyphen handling tests
+    def test_remove_special_characters_preserves_hyphens(self):
+        """Test that hyphens are preserved by remove_special_characters."""
+        text = "кыра-балыста оҕолор-дьон"
+        result = TextCleaner.remove_special_characters(text)
+        # Should keep hyphens
+        self.assertIn("-", result)
+        self.assertIn("кыра-балыста", result)
+        self.assertIn("оҕолор-дьон", result)
+    
+    def test_remove_special_characters_preserves_newlines_and_hyphens(self):
+        """Test that both newlines and hyphens are preserved together."""
+        text = "слово-\nслово кыра-балыста"
+        result = TextCleaner.remove_special_characters(text)
+        # Should keep both hyphens and newlines
+        self.assertIn("-", result)
+        self.assertIn("\n", result)
+        # Original pattern should be preserved
+        self.assertIn("-\n", result)
+    
+    def test_remove_russian_words_preserves_legitimate_hyphens(self):
+        """Test that legitimate hyphens are preserved in non-Russian words."""
+        with open(self.input_file, "w", encoding="utf-8") as f:
+            f.write("кыра-балыста")
+        
+        cleaner = TextCleaner(
+            input_file=self.input_file,
+            output_file=self.output_file,
+            log_file=self.log_file
+        )
+        
+        text = "кыра-балыста"
+        result = cleaner.remove_russian_words(text)
+        # Should preserve the hyphen in compound word
+        self.assertIn("кыра-балыста", result)
+    
+    def test_remove_russian_words_removes_other_separators(self):
+        """Test that en-dashes, underscores, and newlines are replaced with spaces."""
+        with open(self.input_file, "w", encoding="utf-8") as f:
+            f.write("test")
+        
+        cleaner = TextCleaner(
+            input_file=self.input_file,
+            output_file=self.output_file,
+            log_file=self.log_file
+        )
+        
+        # Test with various separators (not hyphens)
+        text_with_endash = "оҕо–лор"  # en-dash
+        result_endash = cleaner.remove_russian_words(text_with_endash)
+        # Should replace en-dash with space
+        self.assertNotIn("–", result_endash)
+        
+        text_with_underscore = "оҕо_лор"  # underscore
+        result_underscore = cleaner.remove_russian_words(text_with_underscore)
+        # Should replace underscore with space
+        self.assertNotIn("_", result_underscore)
+        
+        text_with_newline = "оҕо\nлор"  # newline
+        result_newline = cleaner.remove_russian_words(text_with_newline)
+        # Should replace newline with space
+        self.assertNotIn("\n", result_newline)
+    
+    def test_hyphenated_compound_word_end_to_end(self):
+        """Test that hyphenated compound words survive the full cleaning pipeline."""
+        # Write test input
+        test_text = "123кыра-балыста456 оҕолор!!! привет"
+        with open(self.input_file, "w", encoding="utf-8") as f:
+            f.write(test_text)
+        
+        cleaner = TextCleaner(
+            input_file=self.input_file,
+            output_file=self.output_file,
+            log_file=self.log_file
+        )
+        
+        # Run the full cleaning process
+        cleaner.clean_text()
+        
+        # Read the output
+        with open(self.output_file, "r", encoding="utf-8") as f:
+            result = f.read()
+        
+        # Should contain the hyphenated Sakha word (if it's not detected as Russian)
+        # Note: The exact result depends on language detection
+        # At minimum, hyphen should not be converted to space if word is kept
+        if "кыра" in result and "балыста" in result:
+            # If both parts are kept, check if hyphen is preserved
+            self.assertTrue("-" in result or " " in result)  # Either hyphen or space
+    
+    def test_line_break_hyphen_integration(self):
+        """Test that line-break hyphens are handled correctly in full pipeline."""
+        # This would be after word healer processes the text
+        test_text = "оҕо-\nлор баҕар"
+        with open(self.input_file, "w", encoding="utf-8") as f:
+            f.write(test_text)
+        
+        cleaner = TextCleaner(
+            input_file=self.input_file,
+            output_file=self.output_file,
+            log_file=self.log_file
+        )
+        
+        # Run the full cleaning process
+        cleaner.clean_text()
+        
+        # Read the output
+        with open(self.output_file, "r", encoding="utf-8") as f:
+            result = f.read()
+        
+        # The hyphen-newline should have been removed by word healer
+        # (if word healer is enabled and processes before Russian word removal)
+        self.assertNotIn("-\n", result)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from src.pdf_processor import PDFProcessor
+from src.parquet_processor import ParquetProcessor
 from src.text_cleaner import TextCleaner
 from src.config import config
 from src.utils import get_timestamp_folder_name
@@ -21,7 +22,7 @@ from cli.common import setup_cli_logging, add_common_arguments, handle_cli_execu
 def main():
     """Main entry point for unified processing pipeline."""
     parser = argparse.ArgumentParser(
-        description="Extract text from PDFs and clean it, saving to timestamped folder",
+        description="Extract text from PDFs, Parquet files and clean it, saving to timestamped folder",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -35,14 +36,14 @@ Examples:
         "--input",
         type=Path,
         default=None,
-        help=f"Input folder containing PDF files (default: {config.input_folder})"
+        help=f"Input folder containing PDF and Parquet files (default: {config.input_folder})"
     )
     
     parser.add_argument(
         "--archive",
         type=Path,
         default=None,
-        help=f"Archive folder for processed PDFs (default: {config.archive_folder})"
+        help=f"Archive folder for processed PDFs and Parquet files (default: {config.archive_folder})"
     )
     
     parser.add_argument(
@@ -81,20 +82,32 @@ Examples:
         """Inner function for execution logic."""
         # Step 1: Extract text from PDFs
         logger.info("Step 1: Extracting text from PDF files...")
-        processor = PDFProcessor(
+        pdf_processor = PDFProcessor(
             input_folder=args.input,
             archive_folder=args.archive,
             output_file=output_file,
             log_file=log_file
         )
         
-        processed_count = processor.process_all_pdfs()
+        pdf_count = pdf_processor.process_all_pdfs()
+        logger.info(f"Successfully processed {pdf_count} PDF file(s).")
         
-        if processed_count == 0:
-            logger.warning("No PDF files were processed. Skipping text cleaning.")
+        # Step 1b: Extract text from Parquet files
+        logger.info("Step 1b: Extracting text from Parquet files...")
+        parquet_processor = ParquetProcessor(
+            input_folder=args.input,
+            archive_folder=args.archive,
+            output_file=output_file,
+            log_file=log_file
+        )
+        
+        parquet_count = parquet_processor.process_all_parquets()
+        logger.info(f"Successfully processed {parquet_count} Parquet file(s).")
+        
+        total_processed = pdf_count + parquet_count
+        if total_processed == 0:
+            logger.warning("No PDF or Parquet files were processed. Skipping text cleaning.")
             return 1
-        
-        logger.info(f"Successfully processed {processed_count} PDF file(s).")
         
         # Step 2: Clean the extracted text
         logger.info("Step 2: Cleaning extracted text...")

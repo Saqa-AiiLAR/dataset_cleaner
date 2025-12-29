@@ -27,6 +27,11 @@ class PDFProcessingError(SaqaParserError):
     pass
 
 
+class ParquetProcessingError(SaqaParserError):
+    """Raised when Parquet processing fails."""
+    pass
+
+
 class TextCleaningError(SaqaParserError):
     """Raised when text cleaning fails."""
     pass

@@ -39,7 +39,9 @@ _NUMERIC_PATTERN = re.compile(r'\d+[\s\-\.]?\d*')
 _cyrillic_chars = ''.join(SAKHA_ALL_CHARS)
 _CYRILLIC_PATTERN = re.compile(rf'[а-яё{re.escape(_cyrillic_chars)}]', re.IGNORECASE)
 _STRICT_MERGE_PATTERN = re.compile(rf'\b([а-яё{re.escape(_cyrillic_chars)}])\s+([а-яё{re.escape(_cyrillic_chars)}])\b', re.IGNORECASE)
-_FALSE_HYPHEN_PATTERN = re.compile(r'(\w+)-(\s+)(\w+)')
+# Pattern for line-break hyphens: word-hyphen-newline(s)-word (OCR artifact)
+# Does NOT match word-word (legitimate hyphenated compound words)
+_FALSE_HYPHEN_PATTERN = re.compile(r'(\w+)-\n+(\w+)')
 
 
 class WordHealer:
@@ -368,31 +370,33 @@ class WordHealer:
         """
         Remove false hyphens (line break artifacts in OCR).
         
-        Merges words separated by hyphen-space if both parts contain Sakha characters.
+        Merges words separated by hyphen-newline(s) if both parts contain Cyrillic characters.
+        Preserves legitimate hyphenated compound words (word-word without newline).
         
         Args:
             text: Input text with potential false hyphens
             
         Returns:
-            Text with false hyphens removed
+            Text with false hyphens removed, legitimate hyphens preserved
         """
-        # Pattern: word-hyphen-space-word
-        # Only merge if both parts contain Sakha characters
+        # Pattern: word-hyphen-newline(s)-word (line break artifact)
+        # Only merge if both parts contain Sakha/Cyrillic characters
         
         def should_merge(match) -> bool:
-            part1, spaces, part2 = match.groups()
-            # Check if both parts contain Sakha anchor characters
-            has_sakha1 = any(char in part1 for char in SAKHA_ANCHOR_CHARS)
-            has_sakha2 = any(char in part2 for char in SAKHA_ANCHOR_CHARS)
+            part1, part2 = match.groups()
+            # Check if both parts contain Cyrillic characters (broader than just Sakha anchors)
+            has_cyrillic1 = _CYRILLIC_PATTERN.search(part1) is not None
+            has_cyrillic2 = _CYRILLIC_PATTERN.search(part2) is not None
             
-            # Only merge if both parts are Sakha (likely a broken word)
-            if has_sakha1 and has_sakha2:
+            # Only merge if both parts contain Cyrillic (likely a broken Sakha word)
+            if has_cyrillic1 and has_cyrillic2:
                 return True
             return False
         
         def replace_hyphen(match: Match[str]) -> str:
             if should_merge(match):
-                return match.group(1) + match.group(3)  # Merge without hyphen
+                # Merge directly without hyphen or space (it's one word split across lines)
+                return match.group(1) + match.group(2)
             return match.group(0)  # Keep original
         
         text = _FALSE_HYPHEN_PATTERN.sub(replace_hyphen, text)

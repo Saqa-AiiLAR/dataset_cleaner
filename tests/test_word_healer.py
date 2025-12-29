@@ -150,22 +150,59 @@ class TestWordHealer(unittest.TestCase):
             exceptions_file.unlink()
     
     # False Hyphen Removal Tests
-    def test_remove_false_hyphens_sakha(self):
-        """Test removal of false hyphens in Sakha words."""
-        text = "оҕо-лор"
+    def test_remove_line_break_hyphens_sakha(self):
+        """Test removal of line-break hyphens (OCR artifacts) in Sakha words."""
+        # Pattern: word-hyphen-newline-word (line break artifact)
+        text = "оҕо-\nлор"
         result = self.healer.remove_false_hyphens(text)
-        # Should merge if both parts contain Sakha characters
-        self.assertIn("оҕолор", result)
-        self.assertNotIn("-", result)
+        # Should merge directly without hyphen or space (it's one word split across lines)
+        self.assertEqual(result, "оҕолор")
+        self.assertNotIn("-\n", result)  # No hyphen-newline
     
-    def test_keep_legitimate_hyphens(self):
-        """Test that legitimate hyphens are kept."""
-        # Russian compound words should keep hyphens
-        text = "рус-ский"
+    def test_preserve_legitimate_hyphens(self):
+        """Test that legitimate compound word hyphens are preserved."""
+        # Pattern: word-hyphen-word (no newline) - legitimate compound
+        text = "кыра-балыста"
         result = self.healer.remove_false_hyphens(text)
-        # Should keep hyphen if not both parts are Sakha
-        # (This depends on implementation - may or may not keep)
-        self.assertIsInstance(result, str)
+        # Should KEEP hyphen (no newline after it)
+        self.assertIn("кыра-балыста", result)
+        self.assertEqual(text, result)  # Should be unchanged
+    
+    def test_remove_line_break_hyphens_cyrillic(self):
+        """Test removal of line-break hyphens in any Cyrillic text."""
+        text = "некото-\nрый"
+        result = self.healer.remove_false_hyphens(text)
+        # Should merge directly since both parts are Cyrillic and hyphen-newline present
+        self.assertEqual(result, "некоторый")
+        self.assertNotIn("-\n", result)
+    
+    def test_preserve_hyphens_without_newline(self):
+        """Test that hyphens NOT followed by newline are preserved."""
+        text = "русско-якутский"
+        result = self.healer.remove_false_hyphens(text)
+        # Should keep hyphen (no newline)
+        self.assertIn("русско-якутский", result)
+        self.assertEqual(text, result)
+    
+    def test_mixed_hyphens_scenario(self):
+        """Test text with both line-break and legitimate hyphens."""
+        text = "кыра-балыста оҕолор-\nо баҕар тыла-\nбаайа"
+        result = self.healer.remove_false_hyphens(text)
+        # Should preserve first hyphen (no newline)
+        self.assertIn("кыра-балыста", result)
+        # Should merge the hyphen-newline sequences directly
+        self.assertNotIn("оҕолор-\nо", result)
+        self.assertNotIn("тыла-\nбаайа", result)
+        self.assertIn("оҕоло", result)  # Merged: оҕолор + о = оҕоло
+        self.assertIn("тылабаайа", result)  # Merged directly
+    
+    def test_line_break_hyphen_multiple_newlines(self):
+        """Test handling of hyphens followed by multiple newlines."""
+        text = "слово-\n\n\nслово"
+        result = self.healer.remove_false_hyphens(text)
+        # Should merge even with multiple newlines, directly without space
+        self.assertNotIn("-\n", result)
+        self.assertEqual(result, "словослово")
     
     # Integration Tests
     def test_heal_text_full_pipeline(self):

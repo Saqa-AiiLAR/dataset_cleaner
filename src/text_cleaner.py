@@ -16,7 +16,7 @@ logger = logging.getLogger("SaqaParser.text_cleaner")
 
 # Pre-compiled regex patterns for performance
 _WORD_PATTERN = regex.compile(r'[\p{L}]+(?:[-–_\n][\p{L}]+)*')
-_LETTER_SPACE_NEWLINE_PATTERN = regex.compile(r'[\p{L} \n]')
+_LETTER_SPACE_NEWLINE_HYPHEN_PATTERN = regex.compile(r'[\p{L} \n-]')
 _SPACED_LETTERS_PATTERN = regex.compile(r'\b(?:\p{L}\s+)+\p{L}\b')
 _WORD_WITH_DOT_PATTERN = regex.compile(r'\p{L}+\.?')
 _SINGLE_LETTER_PATTERN = regex.compile(r'\p{L}')
@@ -73,8 +73,9 @@ class TextCleaner(BaseProcessor):
             if self.classifier.is_russian_word(w):
                 russian_words_found.append(w)
             else:
-                # For non-Russian words, replace separators (-, –, _, \n) with spaces
-                cleaned_word = w.replace('-', ' ').replace('–', ' ').replace('_', ' ').replace('\n', ' ')
+                # For non-Russian words, replace separators (–, _, \n) with spaces
+                # but preserve hyphens (-) for legitimate compound words
+                cleaned_word = w.replace('–', ' ').replace('_', ' ').replace('\n', ' ')
                 # Remove extra spaces and add to clean words
                 cleaned_word = ' '.join(cleaned_word.split())
                 if cleaned_word:  # Only add if word is not empty after cleaning
@@ -102,6 +103,7 @@ class TextCleaner(BaseProcessor):
         - Letters (Cyrillic and non-Cyrillic)
         - Spaces
         - Line breaks (\n)
+        - Hyphens (-) for compound words
         
         Args:
             text: Input text
@@ -109,12 +111,12 @@ class TextCleaner(BaseProcessor):
         Returns:
             Text with special characters removed
         """
-        # Pattern to match: Unicode letters, spaces, or newlines
+        # Pattern to match: Unicode letters, spaces, newlines, or hyphens
         # \p{L} matches any Unicode letter (includes Cyrillic and Latin)
-        # Space character and \n for line breaks
+        # Space character, \n for line breaks, and - for compound words
         
-        # Find all matching characters (letters, spaces, newlines)
-        matches = _LETTER_SPACE_NEWLINE_PATTERN.findall(text)
+        # Find all matching characters (letters, spaces, newlines, hyphens)
+        matches = _LETTER_SPACE_NEWLINE_HYPHEN_PATTERN.findall(text)
         
         # Join the matches back together
         return ''.join(matches)
