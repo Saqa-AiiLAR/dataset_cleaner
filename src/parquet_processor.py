@@ -7,6 +7,13 @@ from pathlib import Path
 from typing import Tuple, Optional
 import logging
 
+try:
+    import pyarrow
+    import pyarrow.lib
+except ImportError:
+    # pyarrow not available, will handle in code
+    pyarrow = None
+
 from .config import config
 from .utils import format_file_size, get_timestamp
 from .exceptions import ParquetProcessingError, ValidationError, MissingFileError
@@ -121,11 +128,18 @@ class ParquetProcessor(BaseProcessor):
             
             logger.info(f"Extracted text from {row_count} rows")
         
-        except pd.errors.ParquetFileError as e:
-            error_msg = f"Invalid Parquet file format in {parquet_path.name}: {str(e)}"
-            logger.error(error_msg)
-            raise ParquetProcessingError(error_msg) from e
         except Exception as e:
+            # Check if it's a pyarrow exception (parquet-specific errors)
+            if pyarrow and isinstance(e, (pyarrow.lib.ArrowInvalid, pyarrow.lib.ArrowIOError, pyarrow.lib.ArrowException)):
+                error_msg = f"Invalid Parquet file format in {parquet_path.name}: {str(e)}"
+                logger.error(error_msg)
+                raise ParquetProcessingError(error_msg) from e
+            # For other exceptions, check if it's a parquet-related error by message
+            error_str = str(e).lower()
+            if 'parquet' in error_str or 'arrow' in error_str or 'invalid' in error_str:
+                error_msg = f"Invalid Parquet file format in {parquet_path.name}: {str(e)}"
+                logger.error(error_msg)
+                raise ParquetProcessingError(error_msg) from e
             error_msg = f"Error extracting text from {parquet_path.name}: {str(e)}"
             logger.error(error_msg)
             raise ParquetProcessingError(error_msg) from e

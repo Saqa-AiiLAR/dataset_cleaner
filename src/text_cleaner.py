@@ -19,7 +19,9 @@ logger = logging.getLogger("SaqaParser.text_cleaner")
 _WORD_PATTERN = regex.compile(r'[\p{L}]+(?:[-–_\n][\p{L}]+)*')
 _LETTER_SPACE_NEWLINE_HYPHEN_PATTERN = regex.compile(r'[\p{L} \n-]')
 _SPACED_LETTERS_PATTERN = regex.compile(r'\b(?:\p{L}\s+)+\p{L}\b')
-_WORD_WITH_DOT_PATTERN = regex.compile(r'\p{L}+\.?')
+# Pattern for words that may include hyphens (compound words) and optional dots
+# Matches: letters, optionally hyphenated parts, optionally a dot at the end
+_WORD_WITH_DOT_PATTERN = regex.compile(r'[\p{L}]+(?:-[\p{L}]+)*\.?')
 _SINGLE_LETTER_PATTERN = regex.compile(r'\p{L}')
 _UPPERCASE_CYRILLIC_PATTERN = regex.compile(r'^[А-ЯЁ]{2,5}$')
 _LATIN_ONLY_PATTERN = regex.compile(r'^[A-Za-z]+$')
