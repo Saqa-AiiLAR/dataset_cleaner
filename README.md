@@ -75,12 +75,65 @@ pip install -e ".[dev]"
 
 ### Basic Workflow
 
-The tool operates in two main steps:
+The tool can be used in two ways:
 
+**Option 1: Unified pipeline (Recommended)**
+- Run `saqa-run` to extract and clean in one command, saving results to timestamped folders
+
+**Option 2: Separate steps**
 1. **Extract text from PDFs** → `saqa.txt`
 2. **Clean the extracted text** → `saqaCleaned.txt`
 
-### Step 1: Extract Text from PDFs
+### Option 1: Unified Pipeline (saqa-run)
+
+The `saqa-run` command performs both extraction and cleaning sequentially, saving results to timestamped folders in the `results/` directory.
+
+**Basic usage:**
+```bash
+saqa-run
+# or if not installed:
+python -m cli.run
+```
+
+This will:
+- Create a timestamped folder in `results/` (format: `DD-MM-YY-HH-MM-SS`, e.g., `19-01-25-19-28-32`)
+- Extract text from all PDF files in `source/` folder
+- Clean the extracted text
+- Save `saqa.txt`, `saqaCleaned.txt`, and `logs` in the timestamped folder
+- Move processed PDFs to `archive/` folder
+
+**With CLI options:**
+```bash
+# Custom source and results paths
+saqa-run --source ./my_pdfs --results ./my_results
+
+# Verbose mode for detailed logging
+saqa-run --verbose
+
+# Quiet mode (only file logging)
+saqa-run --quiet
+
+# Full example with all options
+saqa-run --source ./pdfs --archive ./processed --results ./output --verbose
+```
+
+**Result structure:**
+```
+results/
+├── 19-01-25-19-28-32/
+│   ├── saqa.txt
+│   ├── saqaCleaned.txt
+│   └── logs
+├── 19-01-25-20-15-45/
+│   ├── saqa.txt
+│   ├── saqaCleaned.txt
+│   └── logs
+└── ...
+```
+
+### Option 2: Separate Steps
+
+#### Step 1: Extract Text from PDFs
 
 Place PDF files in the `source/` folder, then run:
 
@@ -117,7 +170,7 @@ This will:
 - Move processed PDFs to `archive/` (or specified archive folder)
 - Log processing details to `logs` (or specified log file)
 
-### Step 2: Clean the Extracted Text
+#### Step 2: Clean the Extracted Text
 
 After extracting text, clean it by running:
 
@@ -158,9 +211,16 @@ This will:
 
 ### CLI Options
 
-Both `pdf_insert.py` and `cleaner.py` support the following options:
+#### saqa-run Options
 
-#### pdf_insert.py Options
+- `--source PATH` - Source folder containing PDF files (default: `source/`)
+- `--archive PATH` - Archive folder for processed PDFs (default: `archive/`)
+- `--results PATH` - Results folder for timestamped output (default: `results/`)
+- `-v, --verbose` - Enable verbose logging (DEBUG level)
+- `-q, --quiet` - Suppress console output (only log to file)
+- `-h, --help` - Show help message
+
+#### pdf_extract Options
 
 - `--source PATH` - Source folder containing PDF files (default: `source/`)
 - `--archive PATH` - Archive folder for processed PDFs (default: `archive/`)
@@ -170,7 +230,7 @@ Both `pdf_insert.py` and `cleaner.py` support the following options:
 - `-q, --quiet` - Suppress console output (only log to file)
 - `-h, --help` - Show help message
 
-#### cleaner.py Options
+#### text_clean Options
 
 - `--input PATH` - Input text file (default: `saqa.txt`)
 - `--output PATH` - Output cleaned text file (default: `saqaCleaned.txt`)
@@ -204,6 +264,8 @@ SaqaParser/
 │   └── .gitkeep            # Preserves folder structure
 ├── archive/                 # Output folder for processed PDFs
 │   └── .gitkeep            # Preserves folder structure
+├── results/                 # Timestamped output folders (created by saqa-run)
+│   └── DD-MM-YY-HH-MM-SS/  # Individual run results
 ├── cli/                     # Command-line interface entry points
 │   ├── __init__.py
 │   ├── pdf_extract.py      # Entry point for PDF extraction
@@ -431,9 +493,18 @@ config.pdf_layout_mode = False
 
 ## Output Files
 
-- **`saqa.txt`**: Raw extracted text from all processed PDFs
-- **`saqaCleaned.txt`**: Cleaned text with Russian words and special characters removed
-- **`logs`**: Processing log with timestamps and statistics
+### Using saqa-run
+
+Results are saved in timestamped folders under `results/`:
+- **`results/DD-MM-YY-HH-MM-SS/saqa.txt`**: Raw extracted text from all processed PDFs
+- **`results/DD-MM-YY-HH-MM-SS/saqaCleaned.txt`**: Cleaned text with Russian words and special characters removed
+- **`results/DD-MM-YY-HH-MM-SS/logs`**: Processing log with timestamps and statistics
+
+### Using separate commands
+
+- **`saqa.txt`**: Raw extracted text from all processed PDFs (in project root)
+- **`saqaCleaned.txt`**: Cleaned text with Russian words and special characters removed (in project root)
+- **`logs`**: Processing log with timestamps and statistics (in project root)
 
 ## Logging
 

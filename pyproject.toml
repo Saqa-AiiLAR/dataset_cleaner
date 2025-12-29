@@ -44,6 +44,7 @@ dev = [
 [project.scripts]
 saqa-pdf-extract = "cli.pdf_extract:main"
 saqa-clean = "cli.text_clean:main"
+saqa-run = "cli.run:main"
 
 [tool.setuptools]
 packages = ["src", "cli"]

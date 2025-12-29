@@ -211,6 +211,7 @@ __marimo__/
 saqa.txt
 saqaCleaned.txt
 logs
+results/
 
 # PDF files (large files, typically processed)
 *.pdf

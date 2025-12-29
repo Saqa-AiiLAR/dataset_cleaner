@@ -15,6 +15,7 @@ class Config:
     # Folder paths
     source_folder: Path = field(default_factory=lambda: Path("source"))
     archive_folder: Path = field(default_factory=lambda: Path("archive"))
+    results_folder: Path = field(default_factory=lambda: Path("results"))
     
     # File paths
     output_file: Path = field(default_factory=lambda: Path("saqa.txt"))
@@ -49,6 +50,7 @@ class Config:
         """Ensure all paths are Path objects."""
         self.source_folder = Path(self.source_folder)
         self.archive_folder = Path(self.archive_folder)
+        self.results_folder = Path(self.results_folder)
         self.output_file = Path(self.output_file)
         self.cleaned_output_file = Path(self.cleaned_output_file)
         self.log_file = Path(self.log_file)

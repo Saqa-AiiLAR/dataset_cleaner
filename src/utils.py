@@ -78,6 +78,17 @@ def get_timestamp() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def get_timestamp_folder_name() -> str:
+    """
+    Get current timestamp formatted as folder name.
+    
+    Returns:
+        Folder name string in format "DD-MM-YY-HH-MM-SS"
+        Example: "19-01-25-19-28-32" (19 January 2025, 19:28:32)
+    """
+    return datetime.now().strftime("%d-%m-%y-%H-%M-%S")
+
+
 def add_error_context(error: Exception, context: str) -> Exception:
     """
     Add context to an error message.
