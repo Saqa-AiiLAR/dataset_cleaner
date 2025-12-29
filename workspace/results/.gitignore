@@ -1,0 +1,16 @@
+# Ignore all files in this folder
+*
+
+# But track .gitkeep and .gitignore files
+!.gitkeep
+!.gitignore
+
+# Security: prevent accidental commits of secrets
+*.env
+*.key
+*.pem
+*.crt
+
+# System files
+.DS_Store
+Thumbs.db

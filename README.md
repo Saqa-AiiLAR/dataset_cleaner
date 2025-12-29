@@ -71,6 +71,40 @@ pip install -e ".[dev]"
 - `natasha>=1.5.0,<2.0.0` - Russian NLP toolkit
 - `regex>=2023.0.0,<2026.0.0` - Advanced regular expressions
 
+### Initial Setup
+
+After cloning the repository, run the setup script to create the required workspace folder structure:
+
+```bash
+python scripts/setup_workspace.py
+```
+
+This script will:
+- Create `workspace/input/` - Place your PDF files here
+- Create `workspace/archive/` - Processed PDFs are moved here
+- Create `workspace/logs/` - Log files are stored here
+- Create `workspace/results/` - Timestamped results are saved here
+
+**Why this is needed:**
+- The workspace folder structure is tracked in Git via `.gitkeep` files
+- Each workspace subfolder has its own `.gitignore` file to ignore user content (PDFs, text files, etc.)
+- This approach ensures folders exist after cloning while keeping user files out of version control
+
+**Setup script options:**
+```bash
+# Dry run (see what would be created)
+python scripts/setup_workspace.py --dry-run
+
+# Include optional folders (logs, results)
+python scripts/setup_workspace.py --include-optional
+
+# Quiet mode (only errors)
+python scripts/setup_workspace.py --quiet
+
+# Specify repository root
+python scripts/setup_workspace.py --root /path/to/repo
+```
+
 ## Usage
 
 ### Basic Workflow
@@ -261,13 +295,23 @@ SaqaParser/
 │   ├── test_word_healer.py
 │   └── test_utils.py
 ├── workspace/               # Working directory for all project files
-│   ├── input/              # Input folder for PDF files (was source/)
-│   ├── archive/            # Output folder for processed PDFs
-│   ├── logs                # Log files
-│   └── results/             # Timestamped output folders (created by saqa-run)
-│       └── DD-MM-YY-HH-MM-SS/  # Individual run results
-├── results/                 # Timestamped output folders (created by saqa-run)
-│   └── DD-MM-YY-HH-MM-SS/  # Individual run results
+│   ├── .gitkeep            # Tracks workspace directory in Git
+│   ├── input/               # Place PDF files here (contents ignored via .gitignore)
+│   │   ├── .gitkeep        # Tracks folder in Git
+│   │   └── .gitignore      # Local ignore rules for this folder
+│   ├── archive/             # Processed PDFs moved here (contents ignored)
+│   │   ├── .gitkeep
+│   │   └── .gitignore
+│   ├── logs/                # Log files (contents ignored)
+│   │   ├── .gitkeep
+│   │   └── .gitignore
+│   └── results/             # Timestamped results (contents ignored)
+│       ├── .gitkeep
+│       └── .gitignore
+│       └── DD-MM-YY-HH-MM-SS/  # Individual run results (created by saqa-run)
+├── scripts/                 # Setup and utility scripts
+│   ├── __init__.py
+│   └── setup_workspace.py  # Script to create workspace folder structure
 ├── cli/                     # Command-line interface entry points
 │   ├── __init__.py
 │   ├── pdf_extract.py      # Entry point for PDF extraction
@@ -627,6 +671,6 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
 ## Notes
 
 - PDF files are moved (not copied) to `workspace/archive/` after processing
-- The `workspace/` folder and its contents are ignored by Git
-- Large files (PDFs, text files) are excluded from Git tracking
+- Workspace folder structure uses local `.gitignore` files in each subfolder to ignore user content (PDFs, text files) while tracking folder structure via `.gitkeep` files
+- Run `python scripts/setup_workspace.py` after cloning to create the required folder structure
 - The tool uses lazy loading for heavy dependencies (pymorphy2, natasha) to improve startup performance

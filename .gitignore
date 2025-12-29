@@ -211,8 +211,9 @@ __marimo__/
 saqa.txt
 saqaCleaned.txt
 
-# Workspace folder (contains all working directories)
-workspace/
+# Workspace folder structure is tracked via .gitkeep files
+# Contents of workspace subfolders are ignored via local .gitignore files
+# See workspace/*/.gitignore for folder-specific ignore rules
 
 # IDE and Editor files
 .vscode/
