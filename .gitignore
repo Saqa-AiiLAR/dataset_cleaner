@@ -245,6 +245,7 @@ desktop.ini
 *.orig
 *.rej
 *.log
+logs
 *.cache
 .cache/
 .pytest_cache/
