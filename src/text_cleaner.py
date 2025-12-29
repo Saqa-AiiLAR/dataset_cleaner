@@ -199,6 +199,8 @@ class TextCleaner(BaseProcessor):
             logger.info(f"Removed {english_words_count} English word(s)")
         if roman_numerals_count > 0:
             logger.info(f"Removed {roman_numerals_count} Roman numeral(s)")
+        else:
+            logger.debug("Roman numeral filter checked - no Roman numerals found")
         
         if (single_letter_count == 0 and abbreviation_count == 0 and spaced_letters_count == 0 
             and english_words_count == 0 and roman_numerals_count == 0):

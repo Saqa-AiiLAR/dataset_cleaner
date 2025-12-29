@@ -68,6 +68,7 @@ class PDFProcessor(BaseProcessor):
         
         extracted_text = ""
         page_count = 0
+        warning_counts = {}  # Dictionary to count repeating warnings
         
         try:
             with pdfplumber.open(pdf_path) as pdf:
@@ -75,7 +76,7 @@ class PDFProcessor(BaseProcessor):
                 logger.info(f"Extracting text from {page_count} pages...")
                 
                 for page_num, page in enumerate(pdf.pages, 1):
-                    page_text = self._extract_page_text_adaptive(page, page_num)
+                    page_text, warning_msg = self._extract_page_text_adaptive(page, page_num, warning_counts)
                     if page_text:
                         extracted_text += page_text
                     
@@ -83,6 +84,12 @@ class PDFProcessor(BaseProcessor):
                     if page_num % config.progress_interval_pages == 0 or page_num == page_count:
                         percentage = (page_num / page_count) * 100
                         logger.info(f"Progress: Page {page_num}/{page_count} ({percentage:.1f}%)")
+                
+                # Log grouped warnings at the end
+                for warning_msg, count in warning_counts.items():
+                    if count >= 1:
+                        page_word = "page" if count == 1 else "pages"
+                        logger.warning(f"{count} {page_word}: {warning_msg}")
         
         except pdfplumber.exceptions.PDFSyntaxError as e:
             error_msg = f"Invalid PDF syntax in {pdf_path.name}: {str(e)}"
@@ -117,7 +124,7 @@ class PDFProcessor(BaseProcessor):
         single_char_words = sum(1 for w in words if len(w) == 1)
         return single_char_words / len(words)
     
-    def _extract_page_text_adaptive(self, page, page_num: int) -> str:
+    def _extract_page_text_adaptive(self, page, page_num: int, warning_counts: dict) -> Tuple[str, Optional[str]]:
         """
         Extract text from a page using adaptive tolerance strategy.
         
@@ -126,17 +133,19 @@ class PDFProcessor(BaseProcessor):
         Args:
             page: pdfplumber page object
             page_num: Page number for logging
+            warning_counts: Dictionary to track repeating warnings
             
         Returns:
-            Extracted text
+            Tuple of (extracted_text, warning_message or None)
         """
         if not config.pdf_adaptive_tolerance:
             # Use default tolerance if adaptive mode is disabled
-            return page.extract_text(
+            text = page.extract_text(
                 x_tolerance=config.pdf_x_tolerance,
                 y_tolerance=config.pdf_y_tolerance,
                 layout=config.pdf_layout_mode
-            )
+            ) or ""
+            return text, None
         
         # Adaptive strategy: try increasing tolerance levels
         tolerance_levels = [
@@ -165,7 +174,7 @@ class PDFProcessor(BaseProcessor):
                 # If score is below threshold, this is good enough
                 if score <= config.pdf_badness_threshold:
                     logger.debug(f"Page {page_num}: Using tolerance ({x_tol}, {y_tol}), score: {score:.3f}")
-                    return page_text
+                    return page_text, None
                 
                 # Track best result so far
                 if score < best_score:
@@ -173,22 +182,25 @@ class PDFProcessor(BaseProcessor):
                     best_text = page_text
                     
             except Exception as e:
-                logger.warning(f"Page {page_num}: Error with tolerance ({x_tol}, {y_tol}): {e}")
+                logger.debug(f"Page {page_num}: Error with tolerance ({x_tol}, {y_tol}): {e}")
                 continue
         
         # Use best result found
         if best_text:
             logger.debug(f"Page {page_num}: Using best tolerance, score: {best_score:.3f}")
+            return best_text, None
         else:
             # Fallback: try with default settings
-            logger.warning(f"Page {page_num}: All tolerance levels failed, using default")
+            warning_msg = "All tolerance levels failed, using default"
+            logger.debug(f"Page {page_num}: {warning_msg}")
+            # Track this warning for grouping
+            warning_counts[warning_msg] = warning_counts.get(warning_msg, 0) + 1
             best_text = page.extract_text(
                 x_tolerance=config.pdf_x_tolerance,
                 y_tolerance=config.pdf_y_tolerance,
                 layout=config.pdf_layout_mode
             ) or ""
-        
-        return best_text
+            return best_text, warning_msg
     
     def process_pdf(self, pdf_path: Path) -> Tuple[int, int]:
         """
@@ -213,7 +225,14 @@ class PDFProcessor(BaseProcessor):
                     f.write(extracted_text)
                 logger.info(f"Extracted and saved text from {pdf_path.name} ({char_count} chars, {page_count} pages)")
             else:
-                logger.warning(f"No text extracted from {pdf_path.name} - file may be empty or unreadable")
+                if char_count == 0 and page_count > 0:
+                    logger.warning(
+                        f"No text extracted from {pdf_path.name} - "
+                        "file may be scanned PDF (images without text layer), "
+                        "protected, or have unreadable structure"
+                    )
+                else:
+                    logger.warning(f"No text extracted from {pdf_path.name} - file may be empty or unreadable")
                 # Still continue processing even if no text extracted
             
             # Move to archive
