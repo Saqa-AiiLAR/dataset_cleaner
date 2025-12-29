@@ -3,7 +3,7 @@ Text cleaning module for removing Russian words and special characters.
 """
 import regex
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import logging
 
 from .config import config
@@ -11,6 +11,7 @@ from .utils import format_file_size, get_timestamp
 from .exceptions import TextCleaningError
 from .language_detector import get_classifier
 from .base_processor import BaseProcessor
+from .exceptions import MissingFileError
 
 logger = logging.getLogger("SaqaParser.text_cleaner")
 
@@ -37,8 +38,7 @@ class TextCleaner(BaseProcessor):
         self.validate_file(self.input_file, must_exist=True, must_be_file=True)
         self.ensure_output_directory(self.output_file)
     
-    @staticmethod
-    def remove_russian_words(text: str) -> str:
+    def remove_russian_words(self, text: str) -> str:
         """
         Remove Russian words from text.
         
@@ -126,7 +126,7 @@ class TextCleaner(BaseProcessor):
             Number of characters in cleaned text
         
         Raises:
-            FileNotFoundError: If input file doesn't exist
+            MissingFileError: If input file doesn't exist
             TextCleaningError: If text cleaning fails
         """
         logger.info(f"Reading {self.input_file}...")
@@ -144,15 +144,25 @@ class TextCleaner(BaseProcessor):
             logger.error(error_msg)
             raise TextCleaningError(error_msg) from e
         
-        logger.info("Processing text (removing special characters, then Russian words)...")
+        logger.info("Processing text (removing special characters, healing OCR errors, then Russian words)...")
         
-        # Process text: first remove special characters, then remove Russian words
+        # Process text: first remove special characters, then heal OCR errors, then remove Russian words
         logger.info("Step 1: Removing special characters and numbers...")
         text_no_special = self.remove_special_characters(input_text)
         word_count = len(regex.findall(r'\p{L}+', text_no_special))
         logger.info(f"Removed special characters. Found {word_count} words to process.")
         
-        logger.info("Step 2: Removing Russian words...")
+        # Step 2: Word healing (repair OCR-broken words) - dynamic step numbering
+        step_num = 2
+        if config.word_healer_enabled:
+            logger.info(f"Step {step_num}: Applying word healing to repair OCR-broken words...")
+            from .word_healer import WordHealer
+            healer = WordHealer()
+            text_no_special = healer.heal_text(text_no_special)
+            logger.info("Word healing complete.")
+            step_num += 1
+        
+        logger.info(f"Step {step_num}: Removing Russian words...")
         cleaned_text = self.remove_russian_words(text_no_special)
         
         # Count characters in output
@@ -179,7 +189,7 @@ class TextCleaner(BaseProcessor):
         
         return char_count
     
-    def _write_log_entry(self, char_count: int, file_size: int, error: str = None):
+    def _write_log_entry(self, char_count: int, file_size: int, error: Optional[str] = None) -> None:
         """
         Write a log entry to the log file.
         

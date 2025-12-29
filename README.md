@@ -16,6 +16,13 @@ SaqaParser is designed to process PDF documents containing Sakha (Yakut) languag
   - Morphological pattern matching
   - Language detection and morphological analysis
 - **Text Cleaning**: Remove special characters, numbers, and punctuation while preserving Sakha text
+- **Word Healer**: Advanced OCR repair module that fixes broken words and character hallucinations
+  - Character normalization (6→ҕ, h→һ, o→ө, etc.)
+  - Broken word repair (merges single letters separated by spaces)
+  - Word boundary protection (prevents merging separate words)
+  - False hyphen removal (fixes line break artifacts)
+  - Exception dictionary support
+- **Adaptive PDF Extraction**: Intelligent tolerance adjustment for better text extraction
 - **CLI Interface**: Command-line interface with flexible options for both PDF extraction and text cleaning
 - **Modular Architecture**: Well-organized codebase with separate modules for different functionalities
 - **Base Processor Architecture**: Common base class for consistent behavior across processors
@@ -79,22 +86,24 @@ Place PDF files in the `source/` folder, then run:
 
 **Basic usage:**
 ```bash
-python pdf_insert.py
+python -m cli.pdf_extract
+# or if installed:
+saqa-pdf-extract
 ```
 
 **With CLI options:**
 ```bash
 # Custom source and output paths
-python pdf_insert.py --source ./my_pdfs --output ./output.txt
+python -m cli.pdf_extract --source ./my_pdfs --output ./output.txt
 
 # Verbose mode for detailed logging
-python pdf_insert.py --verbose
+python -m cli.pdf_extract --verbose
 
 # Quiet mode (only file logging)
-python pdf_insert.py --quiet
+python -m cli.pdf_extract --quiet
 
 # Full example with all options
-python pdf_insert.py --source ./pdfs --archive ./processed --output ./text.txt --log ./app.log --verbose
+python -m cli.pdf_extract --source ./pdfs --archive ./processed --output ./text.txt --log ./app.log --verbose
 ```
 
 **Using entry point (if installed):**
@@ -114,22 +123,24 @@ After extracting text, clean it by running:
 
 **Basic usage:**
 ```bash
-python cleaner.py
+python -m cli.text_clean
+# or if installed:
+saqa-clean
 ```
 
 **With CLI options:**
 ```bash
 # Custom input and output paths
-python cleaner.py --input ./input.txt --output ./cleaned.txt
+python -m cli.text_clean --input ./input.txt --output ./cleaned.txt
 
 # Verbose mode
-python cleaner.py --verbose
+python -m cli.text_clean --verbose
 
 # Quiet mode
-python cleaner.py --quiet
+python -m cli.text_clean --quiet
 
 # Full example
-python cleaner.py --input saqa.txt --output cleaned.txt --log app.log --verbose
+python -m cli.text_clean --input saqa.txt --output cleaned.txt --log app.log --verbose
 ```
 
 **Using entry point (if installed):**
@@ -140,6 +151,7 @@ saqa-clean --input saqa.txt --output cleaned.txt
 This will:
 - Read text from `saqa.txt` (or specified input file)
 - Remove special characters and numbers
+- **Apply word healing** to repair OCR-broken words (normalize characters, merge broken words)
 - Remove Russian words using multi-layer classification
 - Save cleaned text to `saqaCleaned.txt` (or specified output file)
 - Log processing details to `logs` (or specified log file)
@@ -179,19 +191,23 @@ SaqaParser/
 │   ├── language_detector.py # Word classification logic
 │   ├── pdf_processor.py     # PDF extraction logic
 │   ├── text_cleaner.py       # Text cleaning logic
+│   ├── word_healer.py       # OCR word repair module
 │   ├── utils.py             # Utility functions
 │   └── exceptions.py        # Custom exceptions
 ├── tests/                   # Test files
 │   ├── __init__.py
 │   ├── test_pdf_processor.py
 │   ├── test_text_cleaner.py
+│   ├── test_word_healer.py
 │   └── test_utils.py
 ├── source/                  # Input folder for PDF files
 │   └── .gitkeep            # Preserves folder structure
 ├── archive/                 # Output folder for processed PDFs
 │   └── .gitkeep            # Preserves folder structure
-├── pdf_insert.py            # Entry point for PDF extraction
-├── cleaner.py               # Entry point for text cleaning
+├── cli/                     # Command-line interface entry points
+│   ├── __init__.py
+│   ├── pdf_extract.py      # Entry point for PDF extraction
+│   └── text_clean.py       # Entry point for text cleaning
 ├── requirements.txt         # Python dependencies
 ├── pyproject.toml          # Modern Python project configuration
 ├── CHANGELOG.md            # Version history
@@ -213,6 +229,16 @@ Configuration is managed in `src/config.py`. You can modify:
   - `primary_language`: Primary language to detect (default: "ru" for Russian)
   - `use_v_as_russian_marker`: Include 'в' as Russian marker (default: True)
   - `pattern_matching_sensitivity`: Threshold for morphological pattern matching (default: 0.8)
+- **Word healer settings**:
+  - `word_healer_enabled`: Enable word healing for OCR repair (default: True)
+  - `word_healer_passes`: Maximum number of repair iterations (default: 5)
+  - `word_healer_exceptions_file`: Optional path to exceptions file (default: None)
+- **PDF extraction settings**:
+  - `pdf_x_tolerance`: Horizontal tolerance for text extraction (default: 3)
+  - `pdf_y_tolerance`: Vertical tolerance for text extraction (default: 3)
+  - `pdf_adaptive_tolerance`: Enable adaptive tolerance strategy (default: True)
+  - `pdf_badness_threshold`: Threshold for retry with higher tolerance (default: 0.3)
+  - `pdf_layout_mode`: Use layout-aware extraction (default: True)
 
 ### Example: Custom Configuration
 
@@ -265,6 +291,14 @@ char_count = cleaner.clean_text()
 classifier = WordClassifier()
 is_russian = classifier.is_russian_word("привет")  # True
 is_sakha = classifier.is_russian_word("баҕар")     # False
+
+# Word healing (OCR repair)
+from src.word_healer import WordHealer
+
+healer = WordHealer()
+broken_text = "о 6 о л о р  баhар"
+healed_text = healer.heal_text(broken_text)
+# Result: "оҕолор баһар" (normalized and repaired)
 ```
 
 ## Multi-Layer Word Classification
@@ -294,6 +328,107 @@ The tool uses a sophisticated multi-layer classification system to distinguish R
 - Morphological analysis (pymorphy2)
 - Name extraction (natasha)
 
+## Word Healer Module
+
+The Word Healer module repairs OCR-related errors in Sakha text before Russian word removal. It addresses common OCR issues:
+
+### Character Normalization
+
+OCR often confuses similar characters. The healer normalizes:
+- `6` → `ҕ` (digit 6 confused with Sakha ҕ)
+- `h` → `һ` (Latin h confused with Sakha һ)
+- `o` → `ө` (Latin o confused with Sakha ө)
+- `y` → `ү` (Latin y confused with Sakha ү)
+- `б` → `ҕ` (Cyrillic б sometimes confused with ҕ)
+
+**Protection**: Numeric sequences (dates, phone numbers, ISBN) are protected from normalization.
+
+### Broken Word Repair
+
+OCR can break words with spaces: `"оҕолор"` → `"о ҕ о л о р"`. The healer:
+- Merges single letters separated by single spaces
+- Preserves word boundaries (double spaces indicate separate words)
+- Uses multiple passes with early termination
+- Validates merged words using Sakha character detection
+
+### Word Boundary Protection
+
+To prevent merging separate short Sakha words (like `"бу"` and `"кинигэ"`):
+- Double or multiple spaces are marked as word boundaries
+- Boundaries are preserved during repair
+- Prevents false merging of adjacent words
+
+### False Hyphen Removal
+
+Removes hyphens that are line break artifacts:
+- `"оҕо-лор"` → `"оҕолор"` (if both parts contain Sakha characters)
+- Only merges when both parts are Sakha words
+
+### Exception Dictionary
+
+Words that should NOT be merged or repaired can be specified:
+- Built-in exceptions: `г.`, `стр.`, `т.д.`, `и т.д.`
+- Optional file-based exceptions: Create `exceptions.txt` with one pattern per line
+
+**Example `exceptions.txt`:**
+```
+# Abbreviations that should not be merged
+г.
+стр.
+т.д.
+
+# Short words (context-dependent)
+бу
+уо
+```
+
+### Configuration
+
+Word healing is enabled by default but can be configured:
+```python
+from src.config import config
+
+# Disable word healing
+config.word_healer_enabled = False
+
+# Adjust number of repair passes
+config.word_healer_passes = 7
+
+# Specify exceptions file
+config.word_healer_exceptions_file = Path("my_exceptions.txt")
+```
+
+## Adaptive PDF Extraction
+
+The PDF processor uses an adaptive tolerance strategy to improve text extraction:
+
+1. **First attempt**: Conservative extraction with `x_tolerance=1, y_tolerance=1`
+2. **Badness score calculation**: Ratio of single-character "words" to total words
+3. **Adaptive retry**: If score > threshold (0.3), retry with higher tolerance
+4. **Progressive tolerance**: Try `(3, 3)`, then `(5, 5)` if needed
+5. **Layout-aware**: Uses `layout=True` for better column detection
+
+This prevents merging text from different columns while still repairing broken words.
+
+### Configuration
+
+```python
+from src.config import config
+
+# Disable adaptive tolerance (use fixed values)
+config.pdf_adaptive_tolerance = False
+
+# Adjust tolerance values
+config.pdf_x_tolerance = 5
+config.pdf_y_tolerance = 5
+
+# Adjust badness threshold
+config.pdf_badness_threshold = 0.4  # More aggressive retry
+
+# Disable layout mode
+config.pdf_layout_mode = False
+```
+
 ## Output Files
 
 - **`saqa.txt`**: Raw extracted text from all processed PDFs
@@ -320,7 +455,7 @@ Log entries include:
 
 The tool includes custom exceptions:
 - `SaqaParserError`: Base exception
-- `FileNotFoundError`: File or folder not found
+- `MissingFileError`: File or folder not found (custom exception)
 - `ValidationError`: Invalid input or configuration
 - `PDFProcessingError`: PDF processing failures
 - `TextCleaningError`: Text cleaning failures
@@ -378,6 +513,17 @@ The project uses modern Python packaging with `pyproject.toml`:
 - The tool uses multiple methods (anchors, markers, patterns, language detection, morphology) for accuracy
 - Adjust `use_v_as_russian_marker` if needed
 - Modify `pattern_matching_sensitivity` for different sensitivity levels
+
+### OCR word breakage issues
+- If words are still broken after healing, increase `word_healer_passes` in config
+- Check that word boundaries (double spaces) are preserved in source text
+- Verify that character normalization is working (check logs with `--verbose`)
+- Add problematic patterns to `exceptions.txt` if they're being incorrectly merged
+
+### PDF extraction quality
+- If text from different columns is merging, disable `pdf_adaptive_tolerance` or reduce tolerance values
+- Increase `pdf_badness_threshold` if too many single-character words remain
+- Try disabling `pdf_layout_mode` for simpler layouts
 
 ### Memory issues with large PDFs
 - Process PDFs in smaller batches

@@ -9,7 +9,7 @@ import logging
 
 from .config import config
 from .utils import format_file_size, get_timestamp
-from .exceptions import PDFProcessingError
+from .exceptions import PDFProcessingError, ValidationError, MissingFileError
 from .base_processor import BaseProcessor
 
 logger = logging.getLogger("SaqaParser.pdf_processor")
@@ -52,13 +52,13 @@ class PDFProcessor(BaseProcessor):
             Tuple of (extracted_text, page_count)
         
         Raises:
-            FileNotFoundError: If PDF file doesn't exist
+            MissingFileError: If PDF file doesn't exist
             ValidationError: If PDF file is invalid or unreadable
             PDFProcessingError: If PDF processing fails
         """
         # Validate PDF file
         if not pdf_path.exists():
-            raise FileNotFoundError(f"PDF file does not exist: {pdf_path}")
+            raise MissingFileError(f"PDF file does not exist: {pdf_path}")
         
         if not pdf_path.is_file():
             raise ValidationError(f"Path is not a file: {pdf_path}")
@@ -75,7 +75,7 @@ class PDFProcessor(BaseProcessor):
                 logger.info(f"Extracting text from {page_count} pages...")
                 
                 for page_num, page in enumerate(pdf.pages, 1):
-                    page_text = page.extract_text()
+                    page_text = self._extract_page_text_adaptive(page, page_num)
                     if page_text:
                         extracted_text += page_text
                     
@@ -94,6 +94,101 @@ class PDFProcessor(BaseProcessor):
             raise PDFProcessingError(error_msg) from e
         
         return extracted_text, page_count
+    
+    def _calculate_badness_score(self, text: str) -> float:
+        """
+        Calculate badness score: ratio of single-character "words" to total words.
+        
+        Higher score indicates more broken words (likely OCR issues).
+        
+        Args:
+            text: Extracted text to analyze
+            
+        Returns:
+            Badness score (0.0-1.0), where 1.0 means all words are single characters
+        """
+        if not text.strip():
+            return 0.0
+        
+        words = text.split()
+        if not words:
+            return 0.0
+        
+        single_char_words = sum(1 for w in words if len(w) == 1)
+        return single_char_words / len(words)
+    
+    def _extract_page_text_adaptive(self, page, page_num: int) -> str:
+        """
+        Extract text from a page using adaptive tolerance strategy.
+        
+        Starts with conservative tolerance and increases if badness score is high.
+        
+        Args:
+            page: pdfplumber page object
+            page_num: Page number for logging
+            
+        Returns:
+            Extracted text
+        """
+        if not config.pdf_adaptive_tolerance:
+            # Use default tolerance if adaptive mode is disabled
+            return page.extract_text(
+                x_tolerance=config.pdf_x_tolerance,
+                y_tolerance=config.pdf_y_tolerance,
+                layout=config.pdf_layout_mode
+            )
+        
+        # Adaptive strategy: try increasing tolerance levels
+        tolerance_levels = [
+            (1, 1),   # Conservative
+            (config.pdf_x_tolerance, config.pdf_y_tolerance),  # Default
+            (5, 5),  # Aggressive
+        ]
+        
+        best_text = ""
+        best_score = 1.0  # Start with worst possible score
+        
+        for x_tol, y_tol in tolerance_levels:
+            try:
+                page_text = page.extract_text(
+                    x_tolerance=x_tol,
+                    y_tolerance=y_tol,
+                    layout=config.pdf_layout_mode
+                ) or ""
+                
+                if not page_text:
+                    continue
+                
+                # Calculate badness score
+                score = self._calculate_badness_score(page_text)
+                
+                # If score is below threshold, this is good enough
+                if score <= config.pdf_badness_threshold:
+                    logger.debug(f"Page {page_num}: Using tolerance ({x_tol}, {y_tol}), score: {score:.3f}")
+                    return page_text
+                
+                # Track best result so far
+                if score < best_score:
+                    best_score = score
+                    best_text = page_text
+                    
+            except Exception as e:
+                logger.warning(f"Page {page_num}: Error with tolerance ({x_tol}, {y_tol}): {e}")
+                continue
+        
+        # Use best result found
+        if best_text:
+            logger.debug(f"Page {page_num}: Using best tolerance, score: {best_score:.3f}")
+        else:
+            # Fallback: try with default settings
+            logger.warning(f"Page {page_num}: All tolerance levels failed, using default")
+            best_text = page.extract_text(
+                x_tolerance=config.pdf_x_tolerance,
+                y_tolerance=config.pdf_y_tolerance,
+                layout=config.pdf_layout_mode
+            ) or ""
+        
+        return best_text
     
     def process_pdf(self, pdf_path: Path) -> Tuple[int, int]:
         """
@@ -130,7 +225,7 @@ class PDFProcessor(BaseProcessor):
             
             return char_count, file_size
         
-        except (PDFProcessingError, FileNotFoundError, ValidationError):
+        except (PDFProcessingError, MissingFileError, ValidationError):
             # Re-raise our custom exceptions
             raise
         except Exception as e:

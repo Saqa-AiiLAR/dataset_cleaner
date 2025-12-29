@@ -7,7 +7,7 @@ from typing import Optional
 import logging
 
 from .utils import validate_path
-from .exceptions import ValidationError, FileNotFoundError
+from .exceptions import ValidationError, MissingFileError
 
 logger = logging.getLogger("SaqaParser.base_processor")
 
@@ -20,7 +20,7 @@ class BaseProcessor(ABC):
     and logging setup.
     """
     
-    def __init__(self, log_file: Optional[Path] = None):
+    def __init__(self, log_file: Optional[Path] = None) -> None:
         """
         Initialize base processor.
         
@@ -61,11 +61,11 @@ class BaseProcessor(ABC):
             create_if_missing: Whether to create directory if it doesn't exist
         
         Raises:
-            FileNotFoundError: If directory doesn't exist and must_exist is True
+            MissingFileError: If directory doesn't exist and must_exist is True
             ValidationError: If directory is not a directory or cannot be created
         """
         if must_exist and not validate_path(directory, must_exist=True, must_be_file=False):
-            raise FileNotFoundError(f"Directory does not exist: {directory}")
+            raise MissingFileError(f"Directory does not exist: {directory}")
         
         if must_exist and not directory.is_dir():
             raise ValidationError(f"Path is not a directory: {directory}")
@@ -91,11 +91,11 @@ class BaseProcessor(ABC):
             must_be_file: Whether the path must be a file
         
         Raises:
-            FileNotFoundError: If file doesn't exist and must_exist is True
+            MissingFileError: If file doesn't exist and must_exist is True
             ValidationError: If path is not a file or is empty
         """
         if must_exist and not validate_path(file_path, must_exist=True, must_be_file=must_be_file):
-            raise FileNotFoundError(f"File does not exist: {file_path}")
+            raise MissingFileError(f"File does not exist: {file_path}")
         
         if must_exist and must_be_file:
             if not file_path.is_file():

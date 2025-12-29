@@ -42,11 +42,11 @@ dev = [
 ]
 
 [project.scripts]
-saqa-pdf-extract = "pdf_insert:main"
-saqa-clean = "cleaner:main"
+saqa-pdf-extract = "cli.pdf_extract:main"
+saqa-clean = "cli.text_clean:main"
 
 [tool.setuptools]
-packages = ["src"]
+packages = ["src", "cli"]
 
 [tool.setuptools.package-data]
 "*" = ["*.txt", "*.md"]

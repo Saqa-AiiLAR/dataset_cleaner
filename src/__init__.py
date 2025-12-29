@@ -6,15 +6,17 @@ from .pdf_processor import PDFProcessor
 from .text_cleaner import TextCleaner
 from .base_processor import BaseProcessor
 from .language_detector import WordClassifier, get_classifier
+from .word_healer import WordHealer
 from .utils import setup_logging, validate_path, format_file_size, get_timestamp
 from .exceptions import (
     SaqaParserError,
     ConfigurationError,
-    FileNotFoundError,
+    MissingFileError,
     PDFProcessingError,
     TextCleaningError,
     ValidationError,
 )
+from .constants import SAKHA_NORMALIZATION_MAP
 
 __version__ = "1.0.0"
 __all__ = [
@@ -25,13 +27,15 @@ __all__ = [
     "BaseProcessor",
     "WordClassifier",
     "get_classifier",
+    "WordHealer",
+    "SAKHA_NORMALIZATION_MAP",
     "setup_logging",
     "validate_path",
     "format_file_size",
     "get_timestamp",
     "SaqaParserError",
     "ConfigurationError",
-    "FileNotFoundError",
+    "MissingFileError",
     "PDFProcessingError",
     "TextCleaningError",
     "ValidationError",

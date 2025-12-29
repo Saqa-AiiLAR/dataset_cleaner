@@ -4,15 +4,17 @@ Utility functions for SaqaParser project.
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
 
+# Deprecated: Use src.logging_config.setup_logging instead
 def setup_logging(log_file: Path, level: int = logging.INFO) -> logging.Logger:
     """
-    Set up logging configuration.
+    Set up logging configuration (DEPRECATED).
+    
+    This function is deprecated. Use src.logging_config.setup_logging instead.
     
     Args:
         log_file: Path to the log file
@@ -21,32 +23,8 @@ def setup_logging(log_file: Path, level: int = logging.INFO) -> logging.Logger:
     Returns:
         Configured logger instance
     """
-    logger = logging.getLogger("SaqaParser")
-    logger.setLevel(level)
-    
-    # Clear existing handlers
-    logger.handlers.clear()
-    
-    # File handler - append mode
-    file_handler = logging.FileHandler(log_file, encoding="utf-8", mode="a")
-    file_handler.setLevel(level)
-    file_formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
-    
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level)
-    console_formatter = logging.Formatter(
-        "%(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
-    
-    return logger
+    from .logging_config import setup_logging as _setup_logging
+    return _setup_logging(log_file, level=level, console=True)
 
 
 def validate_path(path: Path, must_exist: bool = True, must_be_file: bool = False) -> bool:
@@ -99,3 +77,18 @@ def get_timestamp() -> str:
     """
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
+def add_error_context(error: Exception, context: str) -> Exception:
+    """
+    Add context to an error message.
+    
+    Args:
+        error: Original exception
+        context: Additional context to add
+    
+    Returns:
+        Exception with added context (same type as input)
+    """
+    error_type = type(error)
+    new_msg = f"{context}: {str(error)}"
+    return error_type(new_msg)

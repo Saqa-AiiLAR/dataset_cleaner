@@ -8,7 +8,7 @@ import os
 
 from src.text_cleaner import TextCleaner
 from src.language_detector import WordClassifier
-from src.exceptions import FileNotFoundError, ValidationError
+from src.exceptions import MissingFileError, ValidationError
 
 
 class TestTextCleaner(unittest.TestCase):
@@ -70,7 +70,7 @@ class TestTextCleaner(unittest.TestCase):
     
     def test_cleaner_initialization_with_missing_file(self):
         """Test TextCleaner initialization with missing input file."""
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(MissingFileError):
             TextCleaner(
                 input_file=Path(self.temp_dir) / "nonexistent.txt",
                 output_file=self.output_file,
@@ -103,7 +103,7 @@ class TestTextCleaner(unittest.TestCase):
         
         # Simple test - actual behavior depends on language detection
         text = "hello world"
-        result = cleaner.remove_russian_words(text)
+        result = cleaner.remove_russian_words(text)  # Now an instance method
         # Should return text with words joined by spaces
         self.assertIsInstance(result, str)
     

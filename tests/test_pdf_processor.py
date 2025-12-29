@@ -7,7 +7,7 @@ import tempfile
 import shutil
 
 from src.pdf_processor import PDFProcessor
-from src.exceptions import FileNotFoundError, ValidationError
+from src.exceptions import MissingFileError, ValidationError
 
 
 class TestPDFProcessor(unittest.TestCase):
@@ -43,7 +43,7 @@ class TestPDFProcessor(unittest.TestCase):
     
     def test_processor_initialization_with_missing_source(self):
         """Test PDFProcessor initialization with missing source folder."""
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(MissingFileError):
             PDFProcessor(
                 source_folder=Path(self.temp_dir) / "nonexistent",
                 archive_folder=self.archive_folder,
@@ -72,7 +72,7 @@ class TestPDFProcessor(unittest.TestCase):
             log_file=self.log_file
         )
         
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(MissingFileError):
             processor.extract_text_from_pdf(Path(self.temp_dir) / "nonexistent.pdf")
     
     def test_extract_text_from_pdf_with_non_pdf_file(self):

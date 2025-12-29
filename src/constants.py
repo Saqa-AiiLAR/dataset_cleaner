@@ -38,3 +38,39 @@ SAKHA_PLURAL_PATTERNS: List[str] = [
 # Possessive suffixes
 SAKHA_POSSESSIVE_PATTERNS: List[str] = ['та', 'тэ', 'тын', 'быт']
 
+# Sakha normalization map for OCR character errors
+# Maps common OCR mistakes to correct Sakha characters
+# WARNING: Only include mappings that are safe and won't corrupt legitimate Russian words
+SAKHA_NORMALIZATION_MAP: dict = {
+    '6': 'ҕ',  # Digit 6 often confused with ҕ (safe: digits in Cyrillic context are rare)
+    'h': 'һ',  # Latin h -> Sakha һ (safe: Latin letters in Cyrillic text are OCR errors)
+    'H': 'Һ',  # Latin H -> Sakha Һ (uppercase) (safe: Latin letters in Cyrillic text are OCR errors)
+    'o': 'ө',  # Latin o -> Sakha ө (safe: Latin letters in Cyrillic text are OCR errors)
+    'O': 'Ө',  # Latin O -> Sakha Ө (uppercase) (safe: Latin letters in Cyrillic text are OCR errors)
+    'y': 'ү',  # Latin y -> Sakha ү (safe: Latin letters in Cyrillic text are OCR errors)
+    'Y': 'Ү',  # Latin Y -> Sakha Ү (uppercase) (safe: Latin letters in Cyrillic text are OCR errors)
+    '8': 'ө',  # Digit 8 sometimes resembles ө (safe: digits in Cyrillic context are rare)
+    # Note: 'б' -> 'ҕ' removed - too risky, can corrupt Russian words (было, быть, объект, etc.)
+    # Note: 'н' -> 'ҥ' is context-dependent and handled separately
+}
+
+# All Sakha-specific characters (anchor chars + uppercase variants)
+SAKHA_ALL_CHARS: Set[str] = SAKHA_ANCHOR_CHARS | {
+    'Һ',  # Uppercase һ
+    'Ө',  # Uppercase ө
+    'Ү',  # Uppercase ү
+    'Ҕ',  # Uppercase ҕ
+    'Ҥ',  # Uppercase ҥ
+}
+
+# Built-in exceptions for word healer
+# Words/patterns that should NOT be merged or repaired
+WORD_HEALER_EXCEPTIONS: List[str] = [
+    'г.',      # Abbreviation: город (city)
+    'стр.',    # Abbreviation: страница (page)
+    'т.д.',    # Abbreviation: так далее (etc.)
+    'и т.д.',  # Abbreviation: и так далее (and etc.)
+    # Note: Short words like 'бу', 'уо', 'ити' are context-dependent
+    # and handled with word boundary protection
+]
+

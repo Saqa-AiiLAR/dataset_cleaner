@@ -13,11 +13,11 @@ class ConfigurationError(SaqaParserError):
     pass
 
 
-class FileNotFoundError(SaqaParserError):
-    """Raised when a required file is not found.
+class MissingFileError(SaqaParserError):
+    """Raised when a required file or directory is not found.
     
-    Note: This is a custom exception. For standard FileNotFoundError,
-    use the built-in exception from Python.
+    This is a custom exception to distinguish from Python's built-in
+    FileNotFoundError while maintaining clear semantics.
     """
     pass
 
