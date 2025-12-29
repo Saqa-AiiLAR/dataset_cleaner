@@ -24,6 +24,7 @@ from .constants import (
     MAX_WORD_LENGTH,
     MAX_CONSONANT_SEQUENCE,
 )
+from .progress import ProgressBar
 
 logger = logging.getLogger("SaqaParser.word_healer")
 
@@ -285,7 +286,10 @@ class WordHealer:
         blocks = text.split(WORD_BLOCK_MARKER)
         processed_blocks = []
         
-        for block in blocks:
+        total_blocks = len(blocks)
+        progress = ProgressBar(total=total_blocks, desc="Healing words")
+        
+        for block_idx, block in enumerate(blocks, 1):
             block_text = block
             previous_length = len(block_text)
             
@@ -362,6 +366,12 @@ class WordHealer:
                 previous_length = current_length
             
             processed_blocks.append(block_text)
+            
+            # Update progress after each block
+            progress.update(block_idx, suffix=f"Pass {pass_num + 1}/{max_passes}")
+        
+        # Finish progress bar
+        progress.finish()
         
         # Join blocks back together with [[BLOCK]] marker
         return WORD_BLOCK_MARKER.join(processed_blocks)

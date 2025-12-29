@@ -11,6 +11,7 @@ from .utils import format_file_size, get_timestamp
 from .exceptions import TextCleaningError, MissingFileError
 from .language_detector import get_classifier
 from .base_processor import BaseProcessor
+from .progress import ProgressBar
 
 logger = logging.getLogger("SaqaParser.text_cleaner")
 
@@ -68,6 +69,7 @@ class TextCleaner(BaseProcessor):
         
         russian_words_found = []
         clean_words = []
+        progress = ProgressBar(total=total_words, desc="Filtering words")
         
         for i, w in enumerate(words, 1):
             if self.classifier.is_russian_word(w):
@@ -81,10 +83,11 @@ class TextCleaner(BaseProcessor):
                 if cleaned_word:  # Only add if word is not empty after cleaning
                     clean_words.append(cleaned_word)
             
-            # Show progress
+            # Update progress bar
             if i % config.progress_interval_words == 0 or i == total_words:
-                percentage = (i / total_words) * 100
-                logger.info(f"Progress: {i}/{total_words} words ({percentage:.1f}%) processed...")
+                progress.update(i)
+        
+        progress.finish()
         
         # Debug: show sample of Russian words found
         if russian_words_found:
@@ -160,9 +163,11 @@ class TextCleaner(BaseProcessor):
         # Extract words (sequences of letters, possibly with dots at the end)
         words = _WORD_WITH_DOT_PATTERN.findall(text)
         
+        total_words = len(words)
         filtered_words = []
+        progress = ProgressBar(total=total_words, desc="Filtering invalid words")
         
-        for word in words:
+        for i, word in enumerate(words, 1):
             word_stripped = word.strip()
             
             # Skip empty words
@@ -199,6 +204,12 @@ class TextCleaner(BaseProcessor):
             
             # Keep the word
             filtered_words.append(word_stripped)
+            
+            # Update progress periodically
+            if i % 10000 == 0 or i == total_words:
+                progress.update(i)
+        
+        progress.finish()
         
         # Log statistics
         if single_letter_count > 0:
@@ -260,9 +271,12 @@ class TextCleaner(BaseProcessor):
         
         # Process text: first remove special characters, then heal OCR errors, then remove Russian words
         logger.info("Step 1: Removing special characters and numbers...")
+        input_char_count = len(input_text)
+        logger.info(f"Processing {input_char_count:,} characters...")
         text_no_special = self.remove_special_characters(input_text)
         word_count = len(_LETTER_PATTERN.findall(text_no_special))
-        logger.info(f"Removed special characters. Found {word_count} words to process.")
+        output_char_count = len(text_no_special)
+        logger.info(f"Removed special characters. {input_char_count:,} -> {output_char_count:,} chars. Found {word_count:,} words to process.")
         
         # Step 2: Word healing (repair OCR-broken words) - dynamic step numbering
         step_num = 2

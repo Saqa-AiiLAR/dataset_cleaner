@@ -11,6 +11,7 @@ from .config import config
 from .utils import format_file_size, get_timestamp
 from .exceptions import ParquetProcessingError, ValidationError, MissingFileError
 from .base_processor import BaseProcessor
+from .progress import ProgressBar
 
 logger = logging.getLogger("SaqaParser.parquet_processor")
 
@@ -238,17 +239,19 @@ class ParquetProcessor(BaseProcessor):
         logger.info(f"Found {total_parquets} Parquet file(s) to process.")
         
         processed_count = 0
+        progress = ProgressBar(total=total_parquets, desc="Processing Parquet")
         
         for parquet_index, parquet_path in enumerate(parquet_files, 1):
             try:
-                logger.info(f"\n[{parquet_index}/{total_parquets}] Processing: {parquet_path.name}")
                 char_count, file_size = self.process_parquet(parquet_path)
                 processed_count += 1
-                logger.info(f"Successfully processed {parquet_path.name} ({format_file_size(file_size)})")
+                progress.update(parquet_index, suffix=parquet_path.name)
             except Exception as e:
                 logger.error(f"Failed to process {parquet_path.name}: {str(e)}")
+                progress.update(parquet_index, suffix=f"Error: {parquet_path.name}")
                 continue
         
-        logger.info(f"\nProcessing complete. Processed {processed_count}/{total_parquets} file(s).")
+        progress.finish()
+        logger.info(f"Processing complete. Processed {processed_count}/{total_parquets} file(s).")
         return processed_count
 

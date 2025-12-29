@@ -12,6 +12,7 @@ from .config import config
 from .utils import format_file_size, get_timestamp
 from .exceptions import PDFProcessingError, ValidationError, MissingFileError
 from .base_processor import BaseProcessor
+from .progress import ProgressBar
 
 logger = logging.getLogger("SaqaParser.pdf_processor")
 
@@ -346,17 +347,19 @@ class PDFProcessor(BaseProcessor):
         logger.info(f"Found {total_pdfs} PDF file(s) to process.")
         
         processed_count = 0
+        progress = ProgressBar(total=total_pdfs, desc="Processing PDFs")
         
         for pdf_index, pdf_path in enumerate(pdf_files, 1):
             try:
-                logger.info(f"\n[{pdf_index}/{total_pdfs}] Processing: {pdf_path.name}")
                 char_count, file_size = self.process_pdf(pdf_path)
                 processed_count += 1
-                logger.info(f"Successfully processed {pdf_path.name} ({format_file_size(file_size)})")
+                progress.update(pdf_index, suffix=pdf_path.name)
             except Exception as e:
                 logger.error(f"Failed to process {pdf_path.name}: {str(e)}")
+                progress.update(pdf_index, suffix=f"Error: {pdf_path.name}")
                 continue
         
-        logger.info(f"\nProcessing complete. Processed {processed_count}/{total_pdfs} file(s).")
+        progress.finish()
+        logger.info(f"Processing complete. Processed {processed_count}/{total_pdfs} file(s).")
         return processed_count
 
