@@ -5,8 +5,14 @@ Provides shared functionality for argument parsing, logging setup, and error han
 """
 import argparse
 import logging
+import sys
 from pathlib import Path
 from typing import Optional, Callable
+
+# Add project root to Python path for direct script execution
+_project_root = Path(__file__).parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 from src.config import config
 from src.logging_config import setup_logging, disable_console_logging

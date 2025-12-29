@@ -6,11 +6,16 @@ import argparse
 import sys
 from pathlib import Path
 
+# Add project root to Python path for direct script execution
+_project_root = Path(__file__).parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from src.pdf_processor import PDFProcessor
 from src.text_cleaner import TextCleaner
 from src.config import config
 from src.utils import get_timestamp_folder_name
-from .common import setup_cli_logging, add_common_arguments, handle_cli_execution
+from cli.common import setup_cli_logging, add_common_arguments, handle_cli_execution
 
 
 def main():
