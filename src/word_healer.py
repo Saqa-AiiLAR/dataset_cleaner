@@ -35,7 +35,11 @@ WORD_BOUNDARY_MARKER = "__WORD_BOUNDARY__"
 # Pre-compiled regex patterns for performance
 _MULTI_SPACE_PATTERN = re.compile(r"\s{2,}")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
-_NUMERIC_PATTERN = re.compile(r"\d+[\s\-\.]?\d*")
+# Numeric sequences to protect from OCR normalization.
+# Intentionally requires at least TWO digits so single-digit OCR errors like "о 6 о"
+# can still be normalized (6->ҕ) in Cyrillic context.
+_NUMERIC_PROTECT_PATTERN = re.compile(r"(?:\d[\d\s\-./]*\d)")
+_LATIN_LETTER_PATTERN = re.compile(r"[A-Za-z]")
 
 # Build Cyrillic pattern once
 _cyrillic_chars = "".join(SAKHA_ALL_CHARS)
@@ -43,8 +47,12 @@ _CYRILLIC_PATTERN = re.compile(rf"[а-яё{re.escape(_cyrillic_chars)}]", re.IGN
 # Pattern to match Cyrillic sequences separated by spaces
 # Matches: Cyrillic sequence + whitespace + Cyrillic sequence
 # The validation function ensures we're merging broken words (not separate words)
-_STRICT_MERGE_PATTERN = re.compile(
-    rf"([а-яё{re.escape(_cyrillic_chars)}]+)\s+([а-яё{re.escape(_cyrillic_chars)}]+)",
+_SINGLE_CYRILLIC_CHAR_PATTERN = re.compile(
+    rf"^[а-яё{re.escape(_cyrillic_chars)}]$",
+    re.IGNORECASE,
+)
+_CYRILLIC_TOKEN_PATTERN = re.compile(
+    rf"^[а-яё{re.escape(_cyrillic_chars)}]+$",
     re.IGNORECASE,
 )
 # Pattern for line-break hyphens: word-hyphen-newline(s)-word (OCR artifact)
@@ -133,9 +141,9 @@ class WordHealer:
             Text with boundaries restored
         """
         # Replace [[BLOCK]] marker with single space
-        text = text.replace(WORD_BLOCK_MARKER, "")
+        text = text.replace(WORD_BLOCK_MARKER, " ")
         # Replace old __WORD_BOUNDARY__ marker for backward compatibility
-        text = text.replace(WORD_BOUNDARY_MARKER, "")
+        text = text.replace(WORD_BOUNDARY_MARKER, " ")
         # Normalize multiple spaces to single space
         text = _WHITESPACE_PATTERN.sub(" ", text)
         return text
@@ -153,9 +161,9 @@ class WordHealer:
         Returns:
             Text with normalized characters
         """
-        # First, identify and protect numeric sequences
-        # Pattern matches numbers, dates, phone numbers, ISBN, etc.
-        numeric_matches = list(_NUMERIC_PATTERN.finditer(text))
+        # First, identify and protect numeric sequences (dates, phone numbers, IDs, etc.)
+        # We protect sequences that contain at least two digits (optionally separated by spaces/punctuation).
+        numeric_matches = list(_NUMERIC_PROTECT_PATTERN.finditer(text))
 
         # Create a set of protected character positions
         protected_positions: Set[int] = set()
@@ -192,6 +200,29 @@ class WordHealer:
                         logger.debug(
                             f"Normalized '{wrong_char}' -> '{correct_char}' at position {i}"
                         )
+
+        # Extra OCR heuristic:
+        # If a Cyrillic 'о/О' appears adjacent to Latin letters, it's very often a mis-OCR of Sakha 'ө/Ө'.
+        # Keep this narrow to avoid corrupting normal Cyrillic text.
+        for i, char in enumerate(result_chars):
+            if char not in {"о", "О"} or i in protected_positions:
+                continue
+
+            window_start = max(0, i - 2)
+            window_end = min(len(result_chars), i + 3)
+            window = "".join(result_chars[window_start:window_end])
+            if _LATIN_LETTER_PATTERN.search(window) is None:
+                continue
+
+            # Ensure we're still in Cyrillic context (same logic as above).
+            before_match = any(
+                _CYRILLIC_PATTERN.match(result_chars[j]) for j in range(max(0, i - 5), i)
+            )
+            after_match = any(
+                _CYRILLIC_PATTERN.match(result_chars[j]) for j in range(i + 1, min(len(result_chars), i + 6))
+            )
+            if before_match or after_match:
+                result_chars[i] = "Ө" if char == "О" else "ө"
 
         return "".join(result_chars)
 
@@ -300,119 +331,91 @@ class WordHealer:
         total_blocks = len(blocks)
         progress = ProgressBar(total=total_blocks, desc="Healing words")
 
+        def _split_long_merged_run_if_needed(merged: str) -> str:
+            """
+            Heuristic split for long merged single-letter runs.
+
+            Some OCR outputs emit *every* character as a token. Merging those tokens blindly can
+            accidentally collapse multiple words into one (e.g., "с а х а т ы л а" -> "сахатыла").
+
+            When a merged candidate is long and has no Sakha anchor characters, try to split it into
+            two valid-looking words, preferring balanced splits.
+            """
+            # Keep short candidates as-is: we don't want to split common words like "кинигэ".
+            if len(merged) < 8:
+                return merged
+
+            # If there's an anchor character, we assume it's a single Sakha word and keep it whole.
+            if any(ch in merged for ch in SAKHA_ANCHOR_CHARS):
+                return merged
+
+            # Both parts must contain at least one vowel and pass phonetic/length checks.
+            best_split: Optional[tuple[int, str]] = None  # (score, text)
+            for split_at in range(2, len(merged) - 1):
+                left = merged[:split_at]
+                right = merged[split_at:]
+
+                if not any(ch in left for ch in SAKHA_VOWELS) or not any(ch in right for ch in SAKHA_VOWELS):
+                    continue
+
+                if not self._check_length_validity(left) or not self._check_length_validity(right):
+                    continue
+                if not self._check_phonetic_validity(left) or not self._check_phonetic_validity(right):
+                    continue
+
+                # Prefer balanced splits (minimize length difference).
+                score = -abs(len(left) - len(right))
+                candidate = f"{left} {right}"
+                if best_split is None or score > best_split[0]:
+                    best_split = (score, candidate)
+
+            return best_split[1] if best_split else merged
+
+        def _merge_single_letter_runs(block_text: str) -> str:
+            # Split on whitespace; we intentionally normalize intra-block whitespace here.
+            # Word boundaries (double spaces) are handled outside via [[BLOCK]] splitting.
+            tokens = block_text.split()
+            if not tokens:
+                return block_text
+
+            merged_tokens: list[str] = []
+            i = 0
+            while i < len(tokens):
+                token = tokens[i]
+
+                if _CYRILLIC_TOKEN_PATTERN.match(token):
+                    # Merge a run of Cyrillic-only tokens *only* if it contains at least one
+                    # single-character token. This fixes OCR outputs like "ба ҕ а р" while
+                    # preserving valid word boundaries like "саха тыла".
+                    run_tokens: list[str] = []
+                    while i < len(tokens) and _CYRILLIC_TOKEN_PATTERN.match(tokens[i]):
+                        run_tokens.append(tokens[i])
+                        i += 1
+
+                    if any(_SINGLE_CYRILLIC_CHAR_PATTERN.match(t) for t in run_tokens):
+                        merged = "".join(run_tokens)
+                        merged_tokens.append(_split_long_merged_run_if_needed(merged))
+                    else:
+                        merged_tokens.extend(run_tokens)
+                    continue
+
+                merged_tokens.append(token)
+                i += 1
+
+            return " ".join(merged_tokens)
+
         for block_idx, block in enumerate(blocks, 1):
             block_text = block
-            previous_length = len(block_text)
+            previous_text = None
             last_pass_num = 0
 
             for pass_num in range(max_passes):
                 last_pass_num = pass_num
-
-                def create_merge_function(current_block_text: str):
-                    """Create a merge function that captures block_text explicitly."""
-                    def merge_with_validation(match: Match[str]) -> str:
-                        """Merge single characters with validation."""
-                        char1 = match.group(1)
-                        char2 = match.group(2)
-
-                        # Get the position in the current block_text
-                        match_start = match.start()
-                        match_end = match.end()
-
-                        # Check if we're merging separate words (should not merge)
-                        # Look backwards: if there's a non-space char immediately before seq1, it's part of a longer word
-                        if match_start > 0:
-                            prev_char = current_block_text[match_start - 1]
-                            if not prev_char.isspace() and _CYRILLIC_PATTERN.match(prev_char):
-                                # seq1 is part of a longer word (not separated by space), don't merge
-                                return match.group(0)
-
-                        # Look forwards: if there's a non-space char immediately after seq2, it's part of a longer word
-                        if match_end < len(current_block_text):
-                            next_char = current_block_text[match_end]
-                            if not next_char.isspace() and _CYRILLIC_PATTERN.match(next_char):
-                                # seq2 is part of a longer word (not separated by space), don't merge
-                                return match.group(0)
-                        
-                        # Check if there are multiple spaces between the sequences (word boundary)
-                        # This prevents merging separate words like "саха тыла"
-                        match_text = current_block_text[match_start:match_end]
-                        if "  " in match_text or "\n" in match_text:
-                            # Multiple spaces or newline indicates word boundary, don't merge
-                            return match.group(0)
-
-                        # Find word boundaries: look for the full word that would contain this merge
-                        # Look backwards for word start (stop at space or non-Cyrillic)
-                        word_start = match_start
-                        for i in range(match_start - 1, -1, -1):
-                            if i < len(current_block_text):
-                                char = current_block_text[i]
-                                if char.isspace():
-                                    break  # Stop at space (word boundary)
-                                if _CYRILLIC_PATTERN.match(char):
-                                    word_start = i
-                                else:
-                                    break  # Stop at non-Cyrillic
-
-                        # Look forwards for word end (stop at space or non-Cyrillic)
-                        word_end = match_end
-                        for i in range(match_end, len(current_block_text)):
-                            if i < len(current_block_text):
-                                char = current_block_text[i]
-                                if char.isspace():
-                                    break  # Stop at space (word boundary)
-                                if _CYRILLIC_PATTERN.match(char):
-                                    word_end = i + 1
-                                else:
-                                    break  # Stop at non-Cyrillic
-
-                        # Simulate the merge: replace the matched pattern with merged chars
-                        # The match consumed: char1 + spaces + char2
-                        # We want to replace it with: char1 + char2 (no spaces)
-                        merged_chars = char1 + char2
-                        # Build the potential word with the merge applied
-                        potential_word_with_spaces = (
-                            current_block_text[word_start:match_start]
-                            + merged_chars
-                            + current_block_text[match_end:word_end]
-                        )
-
-                        # Remove all spaces to get the clean word for validation
-                        potential_word_clean = re.sub(r"\s+", "", potential_word_with_spaces)
-
-                        # Skip validation if word is empty or too short
-                        if len(potential_word_clean) <= 1:
-                            return merged_chars
-
-                        # Check validity
-                        if not self._check_length_validity(potential_word_clean):
-                            logger.debug(f"Rollback: length check failed for '{potential_word_clean}'")
-                            return match.group(0)  # Don't merge - return original
-
-                        if not self._check_phonetic_validity(potential_word_clean):
-                            logger.debug(
-                                f"Rollback: phonetic check failed for '{potential_word_clean}'"
-                            )
-                            return match.group(0)  # Don't merge - return original
-
-                        # Merge is valid - return merged chars (char2 was consumed by pattern, so no duplication)
-                        return merged_chars
-
-                    return merge_with_validation
-
-                # Apply strict merge pattern with validation
-                block_text = _STRICT_MERGE_PATTERN.sub(
-                    create_merge_function(block_text), block_text
-                )
-
-                current_length = len(block_text)
-
-                # Early termination: if length stopped decreasing, no more improvement
-                if current_length >= previous_length:
-                    logger.debug(f"Early termination at pass {pass_num + 1} (no length change)")
+                if previous_text is not None and block_text == previous_text:
+                    logger.debug(f"Early termination at pass {pass_num + 1} (no change)")
                     break
-
-                previous_length = current_length
+                previous_text = block_text
+                block_text = _merge_single_letter_runs(block_text)
 
             processed_blocks.append(block_text)
 

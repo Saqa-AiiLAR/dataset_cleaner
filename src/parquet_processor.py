@@ -2,18 +2,10 @@
 Parquet processing module for extracting text from Parquet files.
 """
 
-import pandas as pd
 import shutil
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 import logging
-
-try:
-    import pyarrow
-    import pyarrow.lib
-except ImportError:
-    # pyarrow not available, will handle in code
-    pyarrow = None
 
 from .config import config
 from .utils import format_file_size, get_timestamp
@@ -26,6 +18,13 @@ logger = logging.getLogger("SaqaParser.parquet_processor")
 
 class ParquetProcessor(BaseProcessor):
     """Handles Parquet text extraction and file management."""
+
+    _MISSING_DEPS_MESSAGE = (
+        "Parquet support is not installed. Install it with "
+        '`pip install -e ".[parquet]"` (or `pip install "saqaparser[parquet]"`).'
+        "\n"
+        "Note: Parquet support requires 64-bit Python on Windows (pyarrow has no 32-bit wheels)."
+    )
 
     def __init__(
         self,
@@ -52,6 +51,36 @@ class ParquetProcessor(BaseProcessor):
         self.validate_directory(self.input_folder, must_exist=True)
         self.validate_directory(self.archive_folder, must_exist=False, create_if_missing=True)
         self.ensure_output_directory(self.output_file)
+
+    @staticmethod
+    def _try_import_parquet_deps() -> Tuple[Any, Any]:
+        """
+        Import Parquet dependencies lazily.
+
+        We intentionally keep Parquet dependencies optional so that users can install and run
+        PDF-only workflows on platforms where `pyarrow` wheels are unavailable.
+        """
+        try:
+            import pandas as pd  # type: ignore
+        except ModuleNotFoundError as e:  # pragma: no cover (covered via tests with patching)
+            raise ParquetProcessingError(ParquetProcessor._MISSING_DEPS_MESSAGE) from e
+
+        try:
+            import pyarrow  # type: ignore
+            import pyarrow.lib  # type: ignore
+        except ModuleNotFoundError as e:  # pragma: no cover (covered via tests with patching)
+            raise ParquetProcessingError(ParquetProcessor._MISSING_DEPS_MESSAGE) from e
+
+        return pd, pyarrow
+
+    def _parquet_deps_available(self) -> bool:
+        """Return True if pandas+pyarrow can be imported, else False (and log once)."""
+        try:
+            self._try_import_parquet_deps()
+        except ParquetProcessingError:
+            logger.warning(self._MISSING_DEPS_MESSAGE)
+            return False
+        return True
 
     def extract_text_from_parquet(self, parquet_path: Path) -> Tuple[str, int]:
         """
@@ -82,6 +111,8 @@ class ParquetProcessor(BaseProcessor):
 
         extracted_text = ""
         row_count = 0
+
+        pd, pyarrow = self._try_import_parquet_deps()
 
         try:
             # Read parquet file using pyarrow engine
@@ -134,7 +165,7 @@ class ParquetProcessor(BaseProcessor):
 
         except Exception as e:
             # Check if it's a pyarrow exception (parquet-specific errors)
-            if pyarrow and isinstance(
+            if pyarrow is not None and isinstance(
                 e, (pyarrow.lib.ArrowInvalid, pyarrow.lib.ArrowIOError, pyarrow.lib.ArrowException)
             ):
                 error_msg = f"Invalid Parquet file format in {parquet_path.name}: {str(e)}"
@@ -259,6 +290,13 @@ class ParquetProcessor(BaseProcessor):
 
         if not parquet_files:
             logger.warning(f"No Parquet files found in input folder: {self.input_folder}")
+            return 0
+
+        if not self._parquet_deps_available():
+            logger.warning(
+                f"Found {len(parquet_files)} Parquet file(s) in {self.input_folder}, "
+                "but Parquet dependencies are missing. Skipping Parquet processing."
+            )
             return 0
 
         total_parquets = len(parquet_files)

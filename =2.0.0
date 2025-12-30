@@ -1,0 +1,35 @@
+Collecting pypdfium2
+  Downloading pypdfium2-5.2.0-py3-none-win32.whl.metadata (67 kB)
+Collecting pandas
+  Downloading pandas-2.0.3-cp38-cp38-win32.whl.metadata (18 kB)
+Collecting python-dateutil>=2.8.2 (from pandas)
+  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting pytz>=2020.1 (from pandas)
+  Using cached pytz-2025.2-py2.py3-none-any.whl.metadata (22 kB)
+Collecting tzdata>=2022.1 (from pandas)
+  Using cached tzdata-2025.3-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting numpy>=1.21.0 (from pandas)
+  Downloading numpy-1.24.4-cp38-cp38-win32.whl.metadata (5.6 kB)
+Collecting six>=1.5 (from python-dateutil>=2.8.2->pandas)
+  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Downloading pypdfium2-5.2.0-py3-none-win32.whl (3.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.0/3.0 MB 17.1 MB/s  0:00:00
+
+Downloading pandas-2.0.3-cp38-cp38-win32.whl (9.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.6/9.6 MB 13.3 MB/s  0:00:00
+
+Downloading numpy-1.24.4-cp38-cp38-win32.whl (12.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.5/12.5 MB 11.9 MB/s  0:00:01
+
+Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Using cached pytz-2025.2-py2.py3-none-any.whl (509 kB)
+Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+Using cached tzdata-2025.3-py2.py3-none-any.whl (348 kB)
+Saved /tmp/pipcheck_win32_more/pypdfium2-5.2.0-py3-none-win32.whl
+Saved /tmp/pipcheck_win32_more/pandas-2.0.3-cp38-cp38-win32.whl
+Saved /tmp/pipcheck_win32_more/numpy-1.24.4-cp38-cp38-win32.whl
+Saved /tmp/pipcheck_win32_more/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+Saved /tmp/pipcheck_win32_more/pytz-2025.2-py2.py3-none-any.whl
+Saved /tmp/pipcheck_win32_more/six-1.17.0-py2.py3-none-any.whl
+Saved /tmp/pipcheck_win32_more/tzdata-2025.3-py2.py3-none-any.whl
+Successfully downloaded pypdfium2 pandas numpy python-dateutil pytz six tzdata

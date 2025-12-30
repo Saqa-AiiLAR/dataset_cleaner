@@ -9,7 +9,11 @@ A Python tool for extracting text from PDF files and cleaning Sakha (Yakut) lang
 ```bash
 git clone <repository-url>
 cd SaqaParser
+python -m pip install --upgrade pip
 pip install -e ".[dev]"
+
+# Optional: enable Parquet support (requires pandas + pyarrow)
+pip install -e ".[dev,parquet]"
 ```
 
 ### Run
@@ -31,6 +35,7 @@ That's it! Your cleaned Sakha text is ready.
 SaqaParser processes Sakha language PDFs in three steps:
 
 1. **Extracts text** from PDF files
+   - (Optionally) extract text from Parquet files if installed with `.[parquet]`
 2. **Repairs OCR errors** (fixes broken words like `о ҕ о л о р` → `оҕолор`)
 3. **Removes Russian words** using intelligent multi-layer detection:
    - Sakha-specific characters (ҕ, ҥ, ө, һ, ү)
@@ -195,7 +200,9 @@ mypy src/ cli/
 ## Requirements
 
 - Python 3.8+
-- See `requirements.txt` or `pyproject.toml` for dependencies
+- `pip` (up-to-date recommended)
+- **Windows note**: Parquet support requires **64-bit Python** (pyarrow has no 32-bit wheels)
+- See `pyproject.toml` for dependency groups (`.[dev]`, `.[parquet]`)
 
 ## License
 

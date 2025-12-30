@@ -19,6 +19,9 @@ This method installs SaqaParser as a package with all entry points.
 git clone <repository-url>
 cd SaqaParser
 
+# Upgrade packaging tooling (helps avoid pyproject/install issues)
+python -m pip install --upgrade pip
+
 # Install in editable mode
 pip install -e .
 
@@ -38,6 +41,9 @@ cd SaqaParser
 # Install dependencies
 pip install -r requirements.txt
 
+# Optional: Parquet support (pandas + pyarrow)
+pip install -r requirements-parquet.txt
+
 # Run using Python modules
 python -m cli.run --help
 ```
@@ -51,8 +57,14 @@ For contributors and developers:
 git clone <repository-url>
 cd SaqaParser
 
+# Upgrade packaging tooling (helps avoid pyproject/install issues)
+python -m pip install --upgrade pip
+
 # Install with development dependencies
 pip install -e ".[dev]"
+
+# Optional: Parquet support (pandas + pyarrow)
+pip install -e ".[dev,parquet]"
 
 # Set up pre-commit hooks
 pre-commit install
@@ -85,6 +97,10 @@ The workspace structure includes:
 - `pymorphy2>=0.9.1,<1.0.0` - Russian morphological analysis
 - `natasha>=1.5.0,<2.0.0` - Russian NLP toolkit
 - `regex>=2023.0.0,<2026.0.0` - Advanced regular expressions
+
+### Optional Dependencies
+
+- `pandas` + `pyarrow` - Required only for Parquet input support (`.[parquet]`)
 
 ### Development Dependencies
 
@@ -196,6 +212,9 @@ pip3 install -e ".[dev]"
 
 pip install -e ".[dev]"
 ```
+
+Notes:
+- Parquet support requires **64-bit Python** on Windows (pyarrow has no 32-bit wheels).
 
 ## Virtual Environment (Recommended)
 
