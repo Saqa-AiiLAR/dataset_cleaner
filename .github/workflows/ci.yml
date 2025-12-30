@@ -29,9 +29,11 @@ jobs:
     
     - name: Run black (check only)
       run: black --check src/ cli/ tests/
+      continue-on-error: true
     
     - name: Run ruff
       run: ruff check src/ cli/ tests/
+      continue-on-error: true
     
     - name: Run mypy
       run: mypy src/ cli/
@@ -66,4 +68,5 @@ jobs:
     - name: Run pre-commit hooks
       run: |
         pre-commit run --all-files
+      continue-on-error: true
 

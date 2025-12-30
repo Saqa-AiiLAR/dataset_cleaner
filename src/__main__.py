@@ -3,6 +3,7 @@ Package-level entry point for SaqaParser.
 
 Allows running the package with: python -m src
 """
+
 import sys
 from pathlib import Path
 
@@ -13,4 +14,3 @@ from cli.pdf_extract import main
 
 if __name__ == "__main__":
     sys.exit(main())
-

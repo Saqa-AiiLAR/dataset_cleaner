@@ -1,6 +1,7 @@
 """
 SaqaParser - PDF text extraction and cleaning tool for Sakha language processing.
 """
+
 from .config import config, Config
 from .pdf_processor import PDFProcessor
 from .text_cleaner import TextCleaner
@@ -39,4 +40,3 @@ __all__ = [
     "TextCleaningError",
     "ValidationError",
 ]
-
