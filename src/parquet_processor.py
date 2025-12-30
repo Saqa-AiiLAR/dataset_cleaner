@@ -136,7 +136,7 @@ class ParquetProcessor(BaseProcessor):
                 raise ParquetProcessingError(error_msg) from e
             # For other exceptions, check if it's a parquet-related error by message
             error_str = str(e).lower()
-            if 'parquet' in error_str or 'arrow' in error_str or 'invalid' in error_str:
+            if 'parquet' in error_str or 'arrow' in error_str:
                 error_msg = f"Invalid Parquet file format in {parquet_path.name}: {str(e)}"
                 logger.error(error_msg)
                 raise ParquetProcessingError(error_msg) from e
