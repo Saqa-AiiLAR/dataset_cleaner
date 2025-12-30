@@ -272,20 +272,44 @@ class WordHealer:
             for i, char in enumerate(result_chars):
                 if char == wrong_char and i not in protected_positions:
                     # Check if surrounded by Cyrillic letters (with optional spaces)
-                    # Look before and after, skipping spaces
+                    # Look before and after, skipping spaces and stopping at punctuation
                     before_match = False
                     after_match = False
 
                     # Check before (look back up to 5 chars, skipping spaces)
-                    for j in range(max(0, i - 5), i):
-                        if j < len(result_chars) and _CYRILLIC_PATTERN.match(result_chars[j]):
+                    # Stop if we hit punctuation (.,;:!?) - not a valid context
+                    chars_checked = 0
+                    for j in range(i - 1, -1, -1):
+                        if j < 0 or j >= len(result_chars):
+                            break
+                        check_char = result_chars[j]
+                        # Stop at punctuation (not a valid context for normalization)
+                        if check_char in ".,;:!?":
+                            break
+                        if check_char.isspace():
+                            continue  # Skip spaces
+                        if _CYRILLIC_PATTERN.match(check_char):
                             before_match = True
+                            break
+                        chars_checked += 1
+                        if chars_checked >= 5:
                             break
 
                     # Check after (look ahead up to 5 chars, skipping spaces)
-                    for j in range(i + 1, min(len(result_chars), i + 6)):
-                        if j < len(result_chars) and _CYRILLIC_PATTERN.match(result_chars[j]):
+                    # Stop if we hit punctuation (.,;:!?) - not a valid context
+                    chars_checked = 0
+                    for j in range(i + 1, len(result_chars)):
+                        check_char = result_chars[j]
+                        # Stop at punctuation (not a valid context for normalization)
+                        if check_char in ".,;:!?":
+                            break
+                        if check_char.isspace():
+                            continue  # Skip spaces
+                        if _CYRILLIC_PATTERN.match(check_char):
                             after_match = True
+                            break
+                        chars_checked += 1
+                        if chars_checked >= 5:
                             break
 
                     # Replace if in Cyrillic context (need at least one Cyrillic letter nearby)
