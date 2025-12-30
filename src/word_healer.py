@@ -465,6 +465,14 @@ class WordHealer:
                         char1 = match.group(1)
                         char2 = match.group(2)
 
+                        # Only merge if at least one part is a single character.
+                        # If both parts are multi-character words, it's likely a missing space.
+                        # EXCEPTION: Allow merging if the combined length is short (e.g. <= 6 chars)
+                        # This allows repairing "са ха" -> "саха" (2+2) and "оҕол ор" -> "оҕолор" (4+2)
+                        # but prevents "саха тыла" (4+4=8)
+                        if len(char1) > 1 and len(char2) > 1 and len(char1 + char2) > 7:
+                            return match.group(0)
+
                         # Get the position in the current block_text
                         match_start = match.start()
                         match_end = match.end()
