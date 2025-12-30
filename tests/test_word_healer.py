@@ -64,6 +64,52 @@ class TestWordHealer(unittest.TestCase):
         # Should normalize o to ө in Cyrillic context
         self.assertIn("ө", result)
 
+    def test_smart_normalize_single_6_in_cyrillic(self):
+        """Test normalization of single 6 -> ҕ in Cyrillic word."""
+        text = "ба6ар"
+        result = self.healer.smart_normalize(text)
+        # Should normalize 6 to ҕ when in Cyrillic context
+        self.assertIn("ҕ", result)
+        self.assertNotIn("6", result)
+        self.assertEqual(result, "баҕар")
+
+    def test_smart_normalize_single_8_in_cyrillic(self):
+        """Test normalization of single 8 -> ө in Cyrillic context."""
+        text = "о 8 о"
+        result = self.healer.smart_normalize(text)
+        # Should normalize 8 to ө when in Cyrillic context
+        self.assertIn("ө", result)
+        self.assertNotIn("8", result)
+
+    def test_smart_normalize_single_6_with_nearby_digits(self):
+        """Test that single 6 is protected when part of multi-digit number."""
+        text = "2006 год"
+        result = self.healer.smart_normalize(text)
+        # Should protect 6 because it's part of "2006" (nearby digits)
+        self.assertIn("2006", result)
+        self.assertNotIn("ҕ", result)
+
+    def test_smart_normalize_single_6_in_page_number(self):
+        """Test that single 6 in page number is not protected but won't normalize without Cyrillic context."""
+        text = "стр. 6"
+        result = self.healer.smart_normalize(text)
+        # Should not protect 6 (no nearby digits), but won't normalize (no Cyrillic context)
+        self.assertIn("6", result)
+        self.assertNotIn("ҕ", result)
+
+    def test_smart_normalize_mixed_scenario(self):
+        """Test mixed scenario with different number types."""
+        text = "о 6 о л о р 2006 год тел. 123-456 ба6ар"
+        result = self.healer.smart_normalize(text)
+        # Single 6 in "о 6 о л о р" should normalize
+        self.assertIn("ҕ", result)
+        # Single 6 in "ба6ар" should normalize
+        self.assertIn("баҕар", result)
+        # Multi-digit "2006" should be protected
+        self.assertIn("2006", result)
+        # Phone number "123-456" should be protected
+        self.assertIn("123-456", result)
+
     # Word Boundary Protection Tests
     def test_protect_word_boundaries_double_space(self):
         """Test that double spaces are preserved as word boundaries."""

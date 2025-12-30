@@ -13,6 +13,7 @@ import tempfile
 import shutil
 from typing import Tuple
 import sys
+import builtins
 from unittest.mock import patch, MagicMock
 
 from src.parquet_processor import ParquetProcessor
@@ -34,7 +35,7 @@ class _BlockImports:
             blocked_prefixes: Tuple of module name prefixes to block
         """
         self.blocked_prefixes = blocked_prefixes
-        self.original_import = __builtins__.__import__
+        self.original_import = builtins.__import__
 
     def __enter__(self) -> "_BlockImports":
         """Enter context manager."""
@@ -44,12 +45,12 @@ class _BlockImports:
                     raise ImportError(f"Blocked import of {name} for testing")
             return self.original_import(name, *args, **kwargs)
 
-        __builtins__.__import__ = blocked_import
+        builtins.__import__ = blocked_import
         return self
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> bool:
         """Exit context manager."""
-        __builtins__.__import__ = self.original_import
+        builtins.__import__ = self.original_import
         return False
 
 

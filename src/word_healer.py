@@ -142,6 +142,100 @@ class WordHealer:
         text = _WHITESPACE_PATTERN.sub(" ", text)
         return text
 
+    def _has_nearby_digits(self, position: int, text: str, max_distance: int = 2) -> bool:
+        """
+        Check for digits near a position (ignoring spaces).
+
+        Args:
+            position: Position to check around
+            text: Text to analyze
+            max_distance: Maximum distance to search (default 2)
+
+        Returns:
+            True if nearby digits are found
+        """
+        # Check before position (up to max_distance chars, ignoring spaces)
+        chars_checked = 0
+        for j in range(position - 1, -1, -1):
+            if j < 0 or j >= len(text):
+                break
+            char = text[j]
+            if char.isspace():
+                continue  # Skip spaces
+            if char.isdigit():
+                return True
+            chars_checked += 1
+            if chars_checked >= max_distance:
+                break
+
+        # Check after position (up to max_distance chars, ignoring spaces)
+        chars_checked = 0
+        for j in range(position + 1, len(text)):
+            char = text[j]
+            if char.isspace():
+                continue  # Skip spaces
+            if char.isdigit():
+                return True
+            chars_checked += 1
+            if chars_checked >= max_distance:
+                break
+
+        return False
+
+    def _classify_numeric_match(self, match: Match[str], text: str) -> bool:
+        """
+        Determine if a numeric match should be protected.
+
+        Args:
+            match: Regex match object for numeric sequence
+            text: Full text containing the match
+
+        Returns:
+            True if should protect, False if not
+        """
+        matched_text = match.group(0)
+        start_pos = match.start()
+        end_pos = match.end()
+
+        # Count digits in the match
+        digit_count = sum(1 for char in matched_text if char.isdigit())
+
+        # Category A: Multi-digit numbers (2+ digits) -> protect
+        if digit_count >= 2:
+            return True
+
+        # Category A: Numbers with separators -> protect
+        if any(sep in matched_text for sep in ["-", ".", "/", " "]):
+            return True
+
+        # Single digit case
+        if digit_count == 1:
+            # Find the digit character in the match (pattern always starts with digits)
+            digit_char = None
+            for char in matched_text:
+                if char.isdigit():
+                    digit_char = char
+                    break
+            
+            if digit_char is None:
+                # Should not happen, but protect for safety
+                return True
+
+            # For single "6" or "8", check if part of numeric context
+            if digit_char in ("6", "8"):
+                # Check for nearby digits (within 2 chars, ignoring spaces)
+                if self._has_nearby_digits(start_pos, text, max_distance=2):
+                    # Has nearby digits -> part of number -> protect
+                    return True
+                # No nearby digits -> allow normalization (don't protect)
+                return False
+
+            # Other single digits -> protect for safety
+            return True
+
+        # Default: protect (should not reach here)
+        return True
+
     def smart_normalize(self, text: str) -> str:
         """
         Normalize OCR character errors BEFORE word repair.
@@ -149,20 +243,26 @@ class WordHealer:
         Protects numeric sequences (dates, phone numbers, etc.) and only
         replaces characters when surrounded by Cyrillic letters.
 
+        Single "6" and "8" digits are not protected if they are not part of
+        a numeric context, allowing normalization in Cyrillic text.
+
         Args:
             text: Input text with potential OCR errors
 
         Returns:
             Text with normalized characters
         """
-        # First, identify and protect numeric sequences
+        # First, identify all numeric sequences
         # Pattern matches numbers, dates, phone numbers, ISBN, etc.
         numeric_matches = list(_NUMERIC_PATTERN.finditer(text))
 
         # Create a set of protected character positions
+        # Only protect matches that are classified as "should protect"
         protected_positions: Set[int] = set()
         for match in numeric_matches:
-            protected_positions.update(range(match.start(), match.end()))
+            if self._classify_numeric_match(match, text):
+                # Add all positions from this match to protected set
+                protected_positions.update(range(match.start(), match.end()))
 
         # Apply normalization for each character in the map
         result_chars = list(text)
