@@ -306,22 +306,23 @@ class WordHealer:
                     # Find word boundaries: look for the full word that would contain this merge
                     # Look backwards for word start
                     word_start = match_start
-                    for i in range(match_start - 1, -1, -1):
-                        if i < len(block_text) and _CYRILLIC_PATTERN.match(block_text[i]):
+                    for i in range(match_start - 1, -1, -1):  # noqa: B023
+                        if i < len(block_text) and _CYRILLIC_PATTERN.match(block_text[i]):  # noqa: B023
                             word_start = i
                         else:
                             break
                     
                     # Look forwards for word end (match_end now includes char2 since pattern consumes it)
                     word_end = match_end
-                    for i in range(match_end, len(block_text)):
-                        if i < len(block_text) and _CYRILLIC_PATTERN.match(block_text[i]):
+                    for i in range(match_end, len(block_text)):  # noqa: B023
+                        if i < len(block_text) and _CYRILLIC_PATTERN.match(block_text[i]):  # noqa: B023
                             word_end = i + 1
                         else:
                             break
                     
                     # Extract the current word (with spaces) - now includes both chars since pattern consumes char2
-                    current_word_with_spaces = block_text[word_start:word_end]
+                    # Note: current_word_with_spaces is computed but not used (kept for clarity)
+                    _ = block_text[word_start:word_end]  # noqa: B023, F841
                     
                     # Simulate the merge: replace the matched pattern with merged chars
                     # The match consumed: char1 + spaces + char2
@@ -329,9 +330,9 @@ class WordHealer:
                     merged_chars = char1 + char2
                     # Build the potential word with the merge applied
                     potential_word_with_spaces = (
-                        block_text[word_start:match_start] + 
+                        block_text[word_start:match_start] +  # noqa: B023
                         merged_chars + 
-                        block_text[match_end:word_end]
+                        block_text[match_end:word_end]  # noqa: B023
                     )
                     
                     # Remove all spaces to get the clean word for validation
@@ -399,9 +400,7 @@ class WordHealer:
             has_cyrillic2 = _CYRILLIC_PATTERN.search(part2) is not None
             
             # Only merge if both parts contain Cyrillic (likely a broken Sakha word)
-            if has_cyrillic1 and has_cyrillic2:
-                return True
-            return False
+            return bool(has_cyrillic1 and has_cyrillic2)
         
         def replace_hyphen(match: Match[str]) -> str:
             if should_merge(match):

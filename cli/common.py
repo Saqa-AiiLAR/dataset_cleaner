@@ -4,6 +4,7 @@ Common CLI utilities for SaqaParser command-line tools.
 Provides shared functionality for argument parsing, logging setup, and error handling.
 """
 import argparse
+import contextlib
 import logging
 import sys
 from pathlib import Path
@@ -14,9 +15,9 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from src.config import config
-from src.logging_config import setup_logging, disable_console_logging
-from src.exceptions import SaqaParserError
+from src.config import config  # noqa: E402
+from src.logging_config import setup_logging, disable_console_logging  # noqa: E402
+from src.exceptions import SaqaParserError  # noqa: E402
 
 
 def ensure_workspace_directories() -> None:
@@ -26,12 +27,10 @@ def ensure_workspace_directories() -> None:
     This is called automatically when CLI commands start to avoid requiring
     users to run setup_workspace.py manually.
     """
-    try:
-        config.setup_directories()
-    except Exception:
+    with contextlib.suppress(Exception):
         # If automatic setup fails, processors will handle directory creation
         # via their own validation, so we don't need to fail here
-        pass
+        config.setup_directories()
 
 
 def setup_cli_logging(

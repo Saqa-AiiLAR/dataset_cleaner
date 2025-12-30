@@ -37,14 +37,13 @@ class BaseProcessor(ABC):
         Raises:
             ValidationError: If log file directory cannot be created
         """
-        if self.log_file:
-            if self.log_file.parent and not self.log_file.parent.exists():
+        if self.log_file and self.log_file.parent and not self.log_file.parent.exists():
                 try:
                     self.log_file.parent.mkdir(parents=True, exist_ok=True)
                 except OSError as e:
                     raise ValidationError(
                         f"Cannot create log directory {self.log_file.parent}: {e}"
-                    )
+                    ) from e
     
     def validate_directory(
         self, 
@@ -74,7 +73,7 @@ class BaseProcessor(ABC):
             try:
                 directory.mkdir(parents=True, exist_ok=True)
             except OSError as e:
-                raise ValidationError(f"Cannot create directory {directory}: {e}")
+                raise ValidationError(f"Cannot create directory {directory}: {e}") from e
     
     def validate_file(
         self, 
@@ -121,7 +120,7 @@ class BaseProcessor(ABC):
             except OSError as e:
                 raise ValidationError(
                     f"Cannot create output directory {output_path.parent}: {e}"
-                )
+                ) from e
     
     @abstractmethod
     def process(self) -> int:

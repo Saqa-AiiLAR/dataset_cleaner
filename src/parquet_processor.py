@@ -106,7 +106,7 @@ class ParquetProcessor(BaseProcessor):
             # Extract text from each row
             # For each row, concatenate values from all text columns
             row_texts = []
-            for idx, row in df.iterrows():
+            for _idx, row in df.iterrows():
                 # Get values from all text columns for this row
                 row_values = []
                 for col in text_columns:

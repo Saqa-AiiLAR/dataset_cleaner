@@ -54,7 +54,7 @@ class TestPDFProcessor(unittest.TestCase):
     def test_processor_creates_archive_folder(self):
         """Test that processor creates archive folder if it doesn't exist."""
         archive_path = Path(self.temp_dir) / "new_archive"
-        processor = PDFProcessor(
+        PDFProcessor(
             input_folder=self.source_folder,
             archive_folder=archive_path,
             output_file=self.output_file,

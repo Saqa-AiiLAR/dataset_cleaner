@@ -11,12 +11,12 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from src.pdf_processor import PDFProcessor
-from src.parquet_processor import ParquetProcessor
-from src.text_cleaner import TextCleaner
-from src.config import config
-from src.utils import get_timestamp_folder_name
-from cli.common import setup_cli_logging, add_common_arguments, handle_cli_execution
+from src.pdf_processor import PDFProcessor  # noqa: E402
+from src.parquet_processor import ParquetProcessor  # noqa: E402
+from src.text_cleaner import TextCleaner  # noqa: E402
+from src.config import config  # noqa: E402
+from src.utils import get_timestamp_folder_name  # noqa: E402
+from cli.common import setup_cli_logging, add_common_arguments, handle_cli_execution  # noqa: E402
 
 
 def main():

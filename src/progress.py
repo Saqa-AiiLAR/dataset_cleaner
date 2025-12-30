@@ -68,10 +68,7 @@ class ProgressBar:
         self.current = min(current, self.total)
         
         # Calculate percentage
-        if self.total > 0:
-            percent = (self.current / self.total) * 100
-        else:
-            percent = 100
+        percent = (self.current / self.total) * 100 if self.total > 0 else 100
         
         # Calculate elapsed time
         elapsed = time.time() - self.start_time

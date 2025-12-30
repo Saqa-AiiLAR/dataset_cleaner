@@ -63,7 +63,7 @@ class AdditionalRulesLoader:
         word_lower = word.lower()
         
         # Minimum stem length
-        MIN_STEM_LENGTH = 2
+        min_stem_length = 2
         
         # All suffixes to try removing (longest first for better matching)
         all_suffixes = (
@@ -83,7 +83,7 @@ class AdditionalRulesLoader:
         for suffix in all_suffixes_sorted:
             if word_lower.endswith(suffix):
                 stem = word_lower[:-len(suffix)]
-                if len(stem) >= MIN_STEM_LENGTH:
+                if len(stem) >= min_stem_length:
                     stems.add(stem)
         
         return stems
@@ -123,7 +123,7 @@ class AdditionalRulesLoader:
             try:
                 with open(txt_file, "r", encoding="utf-8") as f:
                     file_words = 0
-                    for line_num, line in enumerate(f, 1):
+                    for _line_num, line in enumerate(f, 1):
                         line = line.strip()
                         
                         # Skip empty lines and comments
@@ -316,11 +316,7 @@ class WordClassifier:
                 return True
         
         # Check noun patterns
-        for pattern in RUSSIAN_NOUN_PATTERNS:
-            if word_lower.endswith(pattern):
-                return True
-        
-        return False
+        return any(word_lower.endswith(pattern) for pattern in RUSSIAN_NOUN_PATTERNS)
     
     @staticmethod
     def matches_sakha_patterns(word: str) -> bool:
@@ -341,11 +337,7 @@ class WordClassifier:
                 return True
         
         # Check possessive patterns
-        for pattern in SAKHA_POSSESSIVE_PATTERNS:
-            if word_lower.endswith(pattern):
-                return True
-        
-        return False
+        return any(word_lower.endswith(pattern) for pattern in SAKHA_POSSESSIVE_PATTERNS)
     
     def is_russian_word(self, word: str) -> bool:
         """
@@ -425,13 +417,12 @@ class WordClassifier:
                 # - Language detection didn't work (detected_lang is None)
                 # - AND we get high-confidence parses (not just any parse)
                 for p in parses:
-                    if p.tag is not None and str(p.tag) != 'UNKN':
-                        # Check if it's a high-confidence parse (normalized form exists)
-                        if p.normal_form and p.normal_form != word.lower():
-                            # This suggests it's a real Russian word with morphology
-                            # But only if language detection didn't say it's NOT Russian
-                            if detected_lang is None:
-                                return True
+                    if (p.tag is not None and str(p.tag) != 'UNKN'
+                            and p.normal_form and p.normal_form != word.lower()
+                            and detected_lang is None):
+                        # This suggests it's a real Russian word with morphology
+                        # But only if language detection didn't say it's NOT Russian
+                        return True
         except Exception:
             pass
         

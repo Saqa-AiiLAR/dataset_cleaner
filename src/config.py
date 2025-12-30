@@ -120,8 +120,9 @@ class Config:
             )
         
         # Validate exceptions file if provided
-        if self.word_healer_exceptions_file is not None:
-            if not self.word_healer_exceptions_file.is_file() and self.word_healer_exceptions_file.exists():
+        if (self.word_healer_exceptions_file is not None
+                and not self.word_healer_exceptions_file.is_file()
+                and self.word_healer_exceptions_file.exists()):
                 raise ValidationError(
                     f"word_healer_exceptions_file must be a file or not exist, got {self.word_healer_exceptions_file}"
                 )

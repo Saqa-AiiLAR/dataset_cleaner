@@ -5,7 +5,7 @@ import pdfplumber
 import shutil
 import regex
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 import logging
 
 from .config import config
@@ -74,7 +74,7 @@ class PDFProcessor(BaseProcessor):
         
         extracted_text = ""
         page_count = 0
-        warning_counts = {}  # Dictionary to count repeating warnings
+        warning_counts: Dict[str, int] = {}  # Dictionary to count repeating warnings
         
         try:
             with pdfplumber.open(pdf_path) as pdf:
