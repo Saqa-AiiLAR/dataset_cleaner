@@ -5,6 +5,8 @@ Provides visual feedback for long-running operations with percentage,
 elapsed time, and ETA estimation.
 """
 
+from __future__ import annotations
+
 import sys
 import time
 from typing import Optional

@@ -2,6 +2,8 @@
 Linguistic constants for Sakha and Russian language detection.
 """
 
+from __future__ import annotations
+
 from typing import Set, List
 
 # Sakha anchor characters (KEEP words with these)

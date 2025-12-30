@@ -2,6 +2,8 @@
 Parquet processing module for extracting text from Parquet files.
 """
 
+from __future__ import annotations
+
 import pandas as pd
 import shutil
 from pathlib import Path

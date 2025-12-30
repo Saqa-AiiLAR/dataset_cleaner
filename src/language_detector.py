@@ -3,6 +3,8 @@ Language detection and word classification module.
 Handles detection of Russian vs Sakha words using multiple strategies.
 """
 
+from __future__ import annotations
+
 from typing import Optional, Set
 from pathlib import Path
 import regex

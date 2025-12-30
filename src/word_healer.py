@@ -9,6 +9,8 @@ This module handles:
 - Exception handling (skipping repair for known patterns)
 """
 
+from __future__ import annotations
+
 import re
 import logging
 from pathlib import Path

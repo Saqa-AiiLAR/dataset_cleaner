@@ -2,6 +2,8 @@
 PDF processing module for extracting text from PDF files.
 """
 
+from __future__ import annotations
+
 import pdfplumber
 import shutil
 import regex

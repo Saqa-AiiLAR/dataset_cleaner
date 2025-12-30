@@ -2,6 +2,8 @@
 Text cleaning module for removing Russian words and special characters.
 """
 
+from __future__ import annotations
+
 import regex
 from pathlib import Path
 from typing import List, Optional
