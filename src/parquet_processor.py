@@ -55,6 +55,120 @@ class ParquetProcessor(BaseProcessor):
         self.validate_directory(self.archive_folder, must_exist=False, create_if_missing=True)
         self.ensure_output_directory(self.output_file)
 
+    def _is_value_null(self, value) -> bool:
+        """
+        Safely check if a value (scalar or array) is null/NaN.
+
+        Handles scalars, lists, tuples, numpy arrays, and pandas Series.
+        For arrays, returns True only if all elements are null.
+
+        Args:
+            value: Value to check (can be scalar, list, array, or Series)
+
+        Returns:
+            True if value is null/NaN (for scalars) or all elements are null (for arrays)
+        """
+        try:
+            # Check if value is array-like (but not a string)
+            if hasattr(value, "__iter__") and not isinstance(value, str):
+                # For array-like values, check if all elements are null
+                if isinstance(value, (list, tuple)):
+                    # For lists/tuples, check each element
+                    if len(value) == 0:
+                        return True
+                    return all(pd.isna(v) if not isinstance(v, str) else False for v in value)
+                elif hasattr(value, "tolist"):
+                    # For numpy arrays or pandas Series, convert to list first
+                    try:
+                        value_list = value.tolist()
+                        if len(value_list) == 0:
+                            return True
+                        return all(pd.isna(v) if not isinstance(v, str) else False for v in value_list)
+                    except (AttributeError, TypeError):
+                        # Fallback: treat as scalar
+                        return pd.isna(value)
+                else:
+                    # Other iterable types - try to iterate
+                    try:
+                        items = list(value)
+                        if len(items) == 0:
+                            return True
+                        return all(pd.isna(v) if not isinstance(v, str) else False for v in items)
+                    except (TypeError, ValueError):
+                        # Can't iterate, treat as scalar
+                        return pd.isna(value)
+            else:
+                # Scalar value - use standard pandas null check
+                return pd.isna(value)
+        except Exception:
+            # If anything goes wrong, fallback to basic check
+            try:
+                return pd.isna(value)
+            except Exception:
+                # Last resort: check if None or empty
+                return value is None or (hasattr(value, "__len__") and len(value) == 0)
+
+    def _convert_value_to_text(self, value) -> str:
+        """
+        Convert any value type (scalar, list, array, Series) to a space-joined string.
+
+        For lists/arrays: joins non-null elements with spaces.
+        For scalars: converts to string and strips whitespace.
+        Returns empty string for null/empty values.
+
+        Args:
+            value: Value to convert (can be scalar, list, array, or Series)
+
+        Returns:
+            Space-joined string representation of the value
+        """
+        try:
+            # Handle array-like values (but not strings)
+            if hasattr(value, "__iter__") and not isinstance(value, str):
+                text_parts = []
+                if isinstance(value, (list, tuple)):
+                    # For lists/tuples, process each element
+                    for v in value:
+                        if v is not None and not pd.isna(v):
+                            text_part = str(v).strip()
+                            if text_part:
+                                text_parts.append(text_part)
+                elif hasattr(value, "tolist"):
+                    # For numpy arrays or pandas Series, convert to list first
+                    try:
+                        value_list = value.tolist()
+                        for v in value_list:
+                            if v is not None and not pd.isna(v):
+                                text_part = str(v).strip()
+                                if text_part:
+                                    text_parts.append(text_part)
+                    except (AttributeError, TypeError):
+                        # Fallback: convert entire value to string
+                        text_parts = [str(value).strip()]
+                else:
+                    # Other iterable types
+                    try:
+                        for v in value:
+                            if v is not None and not pd.isna(v):
+                                text_part = str(v).strip()
+                                if text_part:
+                                    text_parts.append(text_part)
+                    except (TypeError, ValueError):
+                        # Can't iterate, treat as scalar
+                        text_parts = [str(value).strip()]
+                
+                return " ".join(text_parts) if text_parts else ""
+            else:
+                # Scalar value - convert to string and strip whitespace
+                return str(value).strip()
+        except Exception as e:
+            # Fallback: convert to string representation
+            logger.debug(f"Error converting value to text: {e}")
+            try:
+                return str(value).strip()
+            except Exception:
+                return ""
+
     def extract_text_from_parquet(self, parquet_path: Path) -> Tuple[str, int]:
         """
         Extract text from a Parquet file.
@@ -118,9 +232,9 @@ class ParquetProcessor(BaseProcessor):
                 for col in text_columns:
                     value = row[col]
                     # Handle NaN/null values by skipping them
-                    if pd.notna(value):
-                        # Convert to string and strip whitespace
-                        text_value = str(value).strip()
+                    if not self._is_value_null(value):
+                        # Convert to string representation (handles scalars, lists, arrays)
+                        text_value = self._convert_value_to_text(value)
                         if text_value:  # Only add non-empty values
                             row_values.append(text_value)
 
