@@ -19,7 +19,7 @@ RUSSIAN_MARKER_CHARS: Set[str] = {"щ", "ц", "ъ", "ф", "в"}
 
 # Russian morphological patterns (DELETE words ending with these)
 # Verb endings
-RUSSIAN_VERB_PATTERNS: List[str] = ["ться", "тся", "ешь", "ишь"]
+RUSSIAN_VERB_PATTERNS: List[str] = ["ться", "тся", "ешь", "ишь", "л"]
 
 # Adjective endings
 RUSSIAN_ADJ_PATTERNS: List[str] = ["ий", "ый", "ая", "ое", "ые"]
@@ -32,6 +32,7 @@ RUSSIAN_NOUN_PATTERNS: List[str] = ["ость", "ение", "ание"]
 SAKHA_PLURAL_PATTERNS: List[str] = [
     "лар",
     "лер",
+    "лэр",
     "лор",
     "лөр",
     "тар",

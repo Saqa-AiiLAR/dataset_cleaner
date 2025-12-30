@@ -40,8 +40,11 @@ _NUMERIC_PATTERN = re.compile(r"\d+[\s\-\.]?\d*")
 # Build Cyrillic pattern once
 _cyrillic_chars = "".join(SAKHA_ALL_CHARS)
 _CYRILLIC_PATTERN = re.compile(rf"[а-яё{re.escape(_cyrillic_chars)}]", re.IGNORECASE)
+# Pattern to match Cyrillic sequences separated by spaces
+# Matches: Cyrillic sequence + whitespace + Cyrillic sequence
+# The validation function ensures we're merging broken words (not separate words)
 _STRICT_MERGE_PATTERN = re.compile(
-    rf"\b([а-яё{re.escape(_cyrillic_chars)}])\s+([а-яё{re.escape(_cyrillic_chars)}])\b",
+    rf"([а-яё{re.escape(_cyrillic_chars)}]+)\s+([а-яё{re.escape(_cyrillic_chars)}]+)",
     re.IGNORECASE,
 )
 # Pattern for line-break hyphens: word-hyphen-newline(s)-word (OCR artifact)
@@ -167,23 +170,23 @@ class WordHealer:
             for i, char in enumerate(result_chars):
                 if char == wrong_char and i not in protected_positions:
                     # Check if surrounded by Cyrillic letters (with optional spaces)
-                    # Look before and after
+                    # Look before and after, skipping spaces
                     before_match = False
                     after_match = False
 
-                    # Check before (look back up to 2 chars for Cyrillic)
-                    for j in range(max(0, i - 2), i):
-                        if _CYRILLIC_PATTERN.match(result_chars[j]):
+                    # Check before (look back up to 5 chars, skipping spaces)
+                    for j in range(max(0, i - 5), i):
+                        if j < len(result_chars) and _CYRILLIC_PATTERN.match(result_chars[j]):
                             before_match = True
                             break
 
-                    # Check after (look ahead up to 2 chars for Cyrillic)
-                    for j in range(i + 1, min(len(result_chars), i + 3)):
-                        if _CYRILLIC_PATTERN.match(result_chars[j]):
+                    # Check after (look ahead up to 5 chars, skipping spaces)
+                    for j in range(i + 1, min(len(result_chars), i + 6)):
+                        if j < len(result_chars) and _CYRILLIC_PATTERN.match(result_chars[j]):
                             after_match = True
                             break
 
-                    # Replace if in Cyrillic context
+                    # Replace if in Cyrillic context (need at least one Cyrillic letter nearby)
                     if before_match or after_match:
                         result_chars[i] = correct_char
                         logger.debug(
@@ -300,8 +303,10 @@ class WordHealer:
         for block_idx, block in enumerate(blocks, 1):
             block_text = block
             previous_length = len(block_text)
+            last_pass_num = 0
 
             for pass_num in range(max_passes):
+                last_pass_num = pass_num
 
                 def create_merge_function(current_block_text: str):
                     """Create a merge function that captures block_text explicitly."""
@@ -314,30 +319,52 @@ class WordHealer:
                         match_start = match.start()
                         match_end = match.end()
 
+                        # Check if we're merging separate words (should not merge)
+                        # Look backwards: if there's a non-space char immediately before seq1, it's part of a longer word
+                        if match_start > 0:
+                            prev_char = current_block_text[match_start - 1]
+                            if not prev_char.isspace() and _CYRILLIC_PATTERN.match(prev_char):
+                                # seq1 is part of a longer word (not separated by space), don't merge
+                                return match.group(0)
+
+                        # Look forwards: if there's a non-space char immediately after seq2, it's part of a longer word
+                        if match_end < len(current_block_text):
+                            next_char = current_block_text[match_end]
+                            if not next_char.isspace() and _CYRILLIC_PATTERN.match(next_char):
+                                # seq2 is part of a longer word (not separated by space), don't merge
+                                return match.group(0)
+                        
+                        # Check if there are multiple spaces between the sequences (word boundary)
+                        # This prevents merging separate words like "саха тыла"
+                        match_text = current_block_text[match_start:match_end]
+                        if "  " in match_text or "\n" in match_text:
+                            # Multiple spaces or newline indicates word boundary, don't merge
+                            return match.group(0)
+
                         # Find word boundaries: look for the full word that would contain this merge
-                        # Look backwards for word start
+                        # Look backwards for word start (stop at space or non-Cyrillic)
                         word_start = match_start
                         for i in range(match_start - 1, -1, -1):
-                            if i < len(current_block_text) and _CYRILLIC_PATTERN.match(
-                                current_block_text[i]
-                            ):
-                                word_start = i
-                            else:
-                                break
+                            if i < len(current_block_text):
+                                char = current_block_text[i]
+                                if char.isspace():
+                                    break  # Stop at space (word boundary)
+                                if _CYRILLIC_PATTERN.match(char):
+                                    word_start = i
+                                else:
+                                    break  # Stop at non-Cyrillic
 
-                        # Look forwards for word end (match_end now includes char2 since pattern consumes it)
+                        # Look forwards for word end (stop at space or non-Cyrillic)
                         word_end = match_end
                         for i in range(match_end, len(current_block_text)):
-                            if i < len(current_block_text) and _CYRILLIC_PATTERN.match(
-                                current_block_text[i]
-                            ):
-                                word_end = i + 1
-                            else:
-                                break
-
-                        # Extract the current word (with spaces) - now includes both chars since pattern consumes char2
-                        # Note: current_word_with_spaces is computed but not used (kept for clarity)
-                        _ = current_block_text[word_start:word_end]  # noqa: F841
+                            if i < len(current_block_text):
+                                char = current_block_text[i]
+                                if char.isspace():
+                                    break  # Stop at space (word boundary)
+                                if _CYRILLIC_PATTERN.match(char):
+                                    word_end = i + 1
+                                else:
+                                    break  # Stop at non-Cyrillic
 
                         # Simulate the merge: replace the matched pattern with merged chars
                         # The match consumed: char1 + spaces + char2
@@ -390,7 +417,7 @@ class WordHealer:
             processed_blocks.append(block_text)
 
             # Update progress after each block
-            progress.update(block_idx, suffix=f"Pass {pass_num + 1}/{max_passes}")
+            progress.update(block_idx, suffix=f"Pass {last_pass_num + 1}/{max_passes}")
 
         # Finish progress bar
         progress.finish()

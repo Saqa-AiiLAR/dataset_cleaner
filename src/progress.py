@@ -64,10 +64,11 @@ class ProgressBar:
             current: Current progress value (0 to total)
             suffix: Optional suffix text to append
         """
-        if self.disable or self.finished:
-            return
-
+        # Update state FIRST, before checking disable/finished
         self.current = min(current, self.total)
+
+        if self.disable or self.finished:
+            return  # Skip output but state is already updated
 
         # Calculate percentage
         percent = (self.current / self.total) * 100 if self.total > 0 else 100
@@ -124,10 +125,13 @@ class ProgressBar:
         Args:
             suffix: Optional suffix text to append
         """
-        if self.disable or self.finished:
-            return
-
+        # Update state FIRST, before checking disable/finished
         self.finished = True
+        self.current = self.total
+
+        if self.disable:
+            return  # Skip output but state is already updated
+
         self.update(self.total, suffix)
         sys.stderr.write("\n")
         sys.stderr.flush()
