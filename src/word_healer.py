@@ -205,7 +205,7 @@ class WordHealer:
             return True
 
         # Category A: Numbers with separators -> protect
-        if any(sep in matched_text for sep in ["-", ".", "/", " "]):
+        if any(sep in matched_text for sep in ["-", ".", "/"]):
             return True
 
         # Single digit case
@@ -236,6 +236,30 @@ class WordHealer:
         # Default: protect (should not reach here)
         return True
 
+    def _collect_marker_positions(self, text: str) -> Set[int]:
+        """
+        Collect positions of word boundary markers to prevent normalization.
+
+        Args:
+            text: Text to analyze
+
+        Returns:
+            Set of protected positions covering all marker characters
+        """
+        protected: Set[int] = set()
+        for marker in (WORD_BLOCK_MARKER, WORD_BOUNDARY_MARKER):
+            if not marker:
+                continue
+            start = 0
+            marker_len = len(marker)
+            while start < len(text):
+                idx = text.find(marker, start)
+                if idx == -1:
+                    break
+                protected.update(range(idx, idx + marker_len))
+                start = idx + marker_len
+        return protected
+
     def smart_normalize(self, text: str) -> str:
         """
         Normalize OCR character errors BEFORE word repair.
@@ -258,7 +282,7 @@ class WordHealer:
 
         # Create a set of protected character positions
         # Only protect matches that are classified as "should protect"
-        protected_positions: Set[int] = set()
+        protected_positions: Set[int] = self._collect_marker_positions(text)
         for match in numeric_matches:
             if self._classify_numeric_match(match, text):
                 # Add all positions from this match to protected set

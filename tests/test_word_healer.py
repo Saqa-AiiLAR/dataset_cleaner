@@ -6,7 +6,7 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from src.word_healer import WordHealer
+from src.word_healer import WordHealer, WORD_BOUNDARY_MARKER
 from src.config import config
 
 
@@ -59,7 +59,7 @@ class TestWordHealer(unittest.TestCase):
 
     def test_smart_normalize_latin_o_to_sakha_o(self):
         """Test normalization of Latin o -> Sakha ө."""
-        text = "оlор"
+        text = "oлор"
         result = self.healer.smart_normalize(text)
         # Should normalize o to ө in Cyrillic context
         self.assertIn("ө", result)
@@ -109,6 +109,27 @@ class TestWordHealer(unittest.TestCase):
         self.assertIn("2006", result)
         # Phone number "123-456" should be protected
         self.assertIn("123-456", result)
+
+    def test_smart_normalize_preserves_block_marker(self):
+        """Ensure [[BLOCK]] marker is not altered during normalization."""
+        from src.constants import WORD_BLOCK_MARKER
+
+        text = f"о 6 о {WORD_BLOCK_MARKER} ба6ар"
+        result = self.healer.smart_normalize(text)
+        # Markers should remain intact
+        self.assertIn(WORD_BLOCK_MARKER, result)
+        # Normalization should still occur around the marker
+        self.assertIn("ҕ", result)
+        self.assertIn("баҕар", result)
+
+    def test_smart_normalize_preserves_word_boundary_marker(self):
+        """Ensure legacy __WORD_BOUNDARY__ marker is preserved."""
+        text = f"{WORD_BOUNDARY_MARKER} о 6 о {WORD_BOUNDARY_MARKER}"
+        result = self.healer.smart_normalize(text)
+        # Markers should remain intact
+        self.assertIn(WORD_BOUNDARY_MARKER, result)
+        # Normalization should still occur within markers
+        self.assertIn("ҕ", result)
 
     # Word Boundary Protection Tests
     def test_protect_word_boundaries_double_space(self):
