@@ -79,7 +79,7 @@ class ProgressBar:
         elapsed = time.time() - self.start_time
 
         # Calculate ETA
-        if self.current > 0 and self.current < self.total:
+        if self.current > 0 and self.current < self.total and elapsed > 0:
             rate = self.current / elapsed
             remaining = (self.total - self.current) / rate if rate > 0 else 0
             eta_str = f"ETA: {self._format_time(remaining)}"
